@@ -1,0 +1,114 @@
+﻿@using app_asistencia_saferisk.Helper// <-- Asegúrate de poner el namespace de tu helper arriba
+
+
+@{
+    var nombres = UsuarioSesionHelper.Nombres(Context); // Context es el HttpContext en la vista
+    var usuarioId = UsuarioSesionHelper.UsuarioId(Context);
+    var perfilId = UsuarioSesionHelper.RolId(Context);
+
+}
+
+<!-- ========== App Menu ========== -->
+<div class="app-menu navbar-menu">
+    <!-- LOGO -->
+    <div class="navbar-brand-box">
+        <!-- Dark Logo-->
+        <a href="@Url.Action("EmpezarTrabajo", "Horarios")" class="logo logo-dark">
+            <span class="logo-sm">
+                <img src="~/assets/images/Icono.png" alt="" height="34">
+            </span>
+            <span class="logo-lg">
+                <img src="~/assets/images/Logo_App_Asistencia.png" alt="" height="100">
+            </span>
+        </a>
+        <!-- Light Logo-->
+        <a href="@Url.Action("EmpezarTrabajo", "Horarios")" class="logo logo-light">
+            <span class="logo-sm">
+                <img src="~/assets/images/Logo_App_Asistencia.png" alt="" height="34">
+            </span>
+            <span class="logo-lg">
+                <img src="~/assets/images/Icono.png" alt="" height="34">
+            </span>
+        </a>
+        <button type="button" class="btn btn-sm p-0 fs-20 header-item float-end btn-vertical-sm-hover" id="vertical-hover">
+            <i class="ri-record-circle-line"></i>
+        </button>
+    </div>
+
+    <div id="scrollbar">
+        <div class="container-fluid">
+
+            <div id="two-column-menu"></div>
+            <ul class="navbar-nav" id="navbar-nav">
+
+
+     
+                @if (perfilId == 1)
+                {
+                    <!-- Dashboard -->
+                    <li class="nav-item">
+                        <a class="nav-link menu-link" href="@Url.Action("EmpezarTrabajo", "Horarios")">
+                            <i data-feather="home" class="icon-dual"></i> <span>Inicio</span>
+                        </a>
+                    </li>
+
+                            <!-- Descargar Reportes -->
+                            <li class="nav-item">
+                                <a class="nav-link menu-link" href="@Url.Action("DescargarReporte", "DescargarReporte")">
+                                    <i data-feather="file-text" class="icon-dual"></i> <span>Descargar reporte asistencia</span>
+                                </a>
+                            </li>
+                 
+                         
+
+
+                  
+                }
+
+                @if (perfilId == 3)
+                {
+                    <!-- Dashboard -->
+                    <li class="nav-item">
+                        <a class="nav-link menu-link" href="@Url.Action("EmpezarTrabajo", "Horarios")">
+                            <i data-feather="home" class="icon-dual"></i> <span>Inicio</span>
+                        </a>
+                    </li>
+
+
+                }
+
+                @if (perfilId == 4)
+                {
+                    <!-- Dashboard -->
+                    <li class="nav-item">
+                        <a class="nav-link menu-link" href="@Url.Action("EmpezarTrabajo", "Horarios")">
+                            <i data-feather="home" class="icon-dual"></i> <span>Inicio</span>
+                        </a>
+                    </li>
+
+
+                        <!-- Descargar Reportes -->
+                        <li class="nav-item">
+                            <a class="nav-link menu-link" href="@Url.Action("DescargarReporte", "DescargarReporte")">
+                                <i data-feather="file-text" class="icon-dual"></i> <span>Descargar reporte asistencia</span>
+                            </a>
+                        </li>
+
+
+                }
+
+                @*     <!-- Configuración -->
+                <li class="nav-item">
+                    <a class="nav-link menu-link" href="@Url.Action("Index", "Configuracion")">
+                        <i data-feather="settings" class="icon-dual"></i> <span>Configuración</span>
+                    </a>
+                </li> *@
+
+            </ul>
+        </div>
+    </div>
+    <div class="sidebar-background"></div>
+</div>
+<!-- Left Sidebar End -->
+<!-- Vertical Overlay-->
+<div class="vertical-overlay"></div>

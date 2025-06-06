@@ -1,0 +1,139 @@
+﻿@{
+    ViewBag.Title = "Iniciar Sesión";
+    Layout = null;
+}
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <title>Login - Sistema</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link href="~/assets/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="~/assets/css/icons.min.css" rel="stylesheet" />
+    <link href="~/assets/css/app.min.css" rel="stylesheet" />
+    <link href="~/assets/css/custom.min.css" rel="stylesheet" />
+
+    <style>
+        #toastContainer {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            z-index: 9999;
+        }
+    </style>
+</head>
+
+<body>
+    @if (ViewBag.Mensaje != null)
+    {
+            <div class="alert alert-warning">
+            @ViewBag.Mensaje
+            </div>
+    }
+
+    <div class="auth-page-wrapper pt-5">
+        <div class="auth-page-content">
+            <div class="container">
+                <div class="row justify-content-center">
+                    <div class="col-lg-10">
+                        <div class="card overflow-hidden auth-card shadow-lg">
+                            <div class="row g-0">
+                                <!-- Imagen a la izquierda -->
+                                <div class="col-lg-6 d-none d-lg-block bg-light">
+                                    <div class="p-4 h-100 d-flex align-items-center justify-content-center">
+                                        <img src="~/assets/images/Logo_App_Asistencia.png" alt="Logo" class="img-fluid w-100" />
+                                    </div>
+                                </div>
+
+                                <!-- Login Form -->
+                                <div class="col-lg-6">
+                                    <div class="p-4 p-sm-5 h-100 d-flex flex-column justify-content-center">
+                                        <div class="mb-4 text-center">
+                                            <h5 class="text-primary">Bienvenido</h5>
+                                            <p class="text-muted">Por favor, inicia sesión para continuar</p>
+                                        </div>
+
+                                        <form id="loginForm">
+                                            <div class="mb-3">
+                                                <label for="UsuarioCi" class="form-label">Cédula</label>
+                                                <input type="text" class="form-control" id="UsuarioCi" name="UsuarioCI" placeholder="Ingrese su cédula" required />
+                                            </div>
+
+                                            <div class="mb-3">
+                                                <label for="UsuarioPass" class="form-label">Contraseña</label>
+                                                <input type="password" class="form-control" id="UsuarioPass" name="UsuarioPassword" placeholder="Ingrese su contraseña" required />
+                                            </div>
+
+                                            <div class="d-grid mt-4">
+                                                <button type="submit" class="btn btn-primary">Iniciar sesión</button>
+                                            </div>
+                                        </form>
+
+                                        <div class="mt-4 text-center text-muted">
+                                            <p class="mb-0">© <script>document.write(new Date().getFullYear())</script> Sistema de Asistencia</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- /Login Form -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="container">
+                <div class="text-center">
+                    <p class="text-muted mb-0">&copy; <script>document.write(new Date().getFullYear())</script> Sistema de Asistencia. Saferisk</p>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toastContainer"></div>
+
+    <script src="~/assets/libs/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const showToast = (message, type = 'danger') => {
+            const toastId = 'toast-' + Date.now();
+            const toastHtml = `
+                <div id="${toastId}" class="toast align-items-center text-bg-${type} border-0 show" role="alert" aria-live="assertive" aria-atomic="true">
+                    <div class="d-flex">
+                        <div class="toast-body">${message}</div>
+                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                    </div>
+                </div>
+            `;
+            const container = document.getElementById('toastContainer');
+            container.insertAdjacentHTML('beforeend', toastHtml);
+            const toastEl = document.getElementById(toastId);
+            new bootstrap.Toast(toastEl, { delay: 5000 }).show();
+        };
+
+        document.getElementById('loginForm').addEventListener('submit', async function (e) {
+            e.preventDefault();
+
+            const ci = document.getElementById('UsuarioCi').value.trim();
+            const pass = document.getElementById('UsuarioPass').value.trim();
+
+            const response = await fetch('@Url.Action("Validar", "Autenticacion")', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ci, pass })
+            });
+
+            const result = await response.json();
+
+            if (response.ok && result.success) {
+                window.location.href = result.redirectUrl;
+            } else {
+                showToast(result.mensaje || 'Error al iniciar sesión.');
+            }
+        });
+    </script>
+</body>
+</html>

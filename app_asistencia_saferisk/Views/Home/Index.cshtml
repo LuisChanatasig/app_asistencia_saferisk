@@ -1,0 +1,305 @@
+﻿@using app_asistencia_saferisk.Helper
+@{
+    ViewBag.Title = "Inicio";
+    var nombres = UsuarioSesionHelper.Nombres(Context);
+}
+
+<div class="container-xxl py-5">
+    <div class="row justify-content-center mb-4">
+        <div class="col-lg-8 text-center">
+            <h2 class="fw-semibold mb-1">
+                <i class="mdi mdi-account-badge-outline text-primary me-2"></i>
+                ¡Bienvenido, @nombres!
+            </h2>
+            <p class="lead text-muted">Este es tu panel principal de asistencia.</p>
+        </div>
+    </div>
+
+    <div class="row justify-content-center g-4">
+        <div class="col-xl-5 col-lg-6">
+            <div class="card card-animate shadow rounded-4">
+                <div class="card-body py-4 text-center">
+                    <i class="mdi mdi-calendar-check text-success" style="font-size: 2.8rem"></i>
+                    <h4 class="fw-bold my-3">Mi Jornada de Hoy</h4>
+
+                    <div class="mb-3">
+                        <span class="badge bg-info-subtle text-info fs-6 px-3 py-2">
+                            <i class="mdi mdi-timer-outline me-1"></i>
+                            Estado: <span id="estadoJornada">Cargando...</span>
+                        </span>
+                    </div>
+
+                    <div id="formLlegadaContainer">
+                        <!-- Aquí va el form si corresponde -->
+                        <div class="d-flex flex-column align-items-center">
+                            <form id="formRegistrarLlegada" class="w-100">
+                                <div class="d-flex justify-content-center gap-4 mb-4">
+                                    <div class="form-check form-check-inline fs-5">
+                                        <input class="form-check-input" type="radio" name="tipoJornada" id="jornadaOficina" value="oficina" checked>
+                                        <label class="form-check-label" for="jornadaOficina">
+                                            <i class="mdi mdi-office-building-marker-outline me-1"></i> Oficina
+                                        </label>
+                                    </div>
+                                    <div class="form-check form-check-inline fs-5">
+                                        <input class="form-check-input" type="radio" name="tipoJornada" id="jornadaRemoto" value="remoto">
+                                        <label class="form-check-label" for="jornadaRemoto">
+                                            <i class="mdi mdi-home-city-outline me-1"></i> Remoto
+                                        </label>
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-success btn-lg w-100" id="btnRegistrarLlegada">
+                                    <span id="btnText"><i class="mdi mdi-login-variant me-1"></i> Registrar Llegada</span>
+                                    <span id="btnSpinner" class="spinner-border spinner-border-sm ms-2" style="display:none"></span>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <div id="accionesJornada" class="my-4" style="display:none">
+                        <div class="d-flex flex-wrap gap-3 justify-content-center">
+                            <button class="btn btn-warning btn-lg" id="btnAlmuerzo">
+                                <i class="mdi mdi-silverware-fork-knife me-1"></i> Almuerzo
+                            </button>
+                            <button class="btn btn-info btn-lg" id="btnBreak">
+                                <i class="mdi mdi-coffee me-1"></i> Break
+                            </button>
+                            <button class="btn btn-danger btn-lg" id="btnSalida">
+                                <i class="mdi mdi-logout-variant me-1"></i> Salida
+                            </button>
+                            <button class="btn btn-secondary btn-lg" id="btnExtras" data-bs-toggle="modal" data-bs-target="#modalExtras">
+                                <i class="mdi mdi-dots-horizontal me-1"></i> Acciones Extra
+                            </button>
+                        </div>
+                    </div>
+
+                    <a href="@Url.Action("DetalleHoy", "Jornada")" class="btn btn-primary btn-lg px-4 mt-3">
+                        <i class="mdi mdi-calendar-star-outline me-1"></i> Ver Detalle
+                    </a>
+
+                    <small class="text-muted d-block mt-2">
+                        Si ya registraste tu llegada hoy, verás el detalle de tu jornada aquí.
+                    </small>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-5 col-lg-6">
+            <div class="card shadow rounded-4 h-100">
+                <div class="card-body py-4">
+                    <h5 class="fw-semibold mb-3">
+                        <i class="mdi mdi-timeline-clock-outline text-warning me-2"></i>
+                        Mi Timeline del Día
+                    </h5>
+                    <div id="timelineEventos">
+                        <div class="text-center py-4 text-muted">
+                            <i class="mdi mdi-progress-clock mdi-36px mb-2"></i>
+                            <br />
+                            Cargando eventos de hoy...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para acciones extra -->
+<div class="modal fade" id="modalExtras" tabindex="-1" aria-labelledby="modalExtrasLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalExtrasLabel">Registrar otra acción</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <select class="form-select" id="extraTipoEvento">
+                        <option value="permiso">Permiso especial</option>
+                        <option value="reunion">Reunión</option>
+                        <option value="visita">Visita cliente</option>
+                        <option value="otro">Otro</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Observaciones</label>
+                    <input type="text" class="form-control" id="extraObservaciones" placeholder="Detalle de la acción">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="btnRegistrarExtra">Registrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast Container -->
+<div id="toastContainer"></div>
+
+@section Scripts {
+    <script>
+        // Cargar estado y timeline, controlar qué se muestra
+        document.addEventListener("DOMContentLoaded", function () {
+            fetch('@Url.Action("EstadoActual", "Jornada")')
+                .then(res => res.json())
+                .then(data => {
+                    document.getElementById("estadoJornada").textContent = data.estado ?? "No iniciada";
+                    if (data.puedeRegistrar) {
+                        document.getElementById("formLlegadaContainer").style.display = "block";
+                        document.getElementById("accionesJornada").style.display = "none";
+                    } else {
+                        document.getElementById("formLlegadaContainer").style.display = "none";
+                        document.getElementById("accionesJornada").style.display = "block";
+                    }
+                });
+
+            fetch('@Url.Action("TimelineHoy", "Jornada")')
+                .then(res => res.json())
+                .then(eventos => {
+                    const cont = document.getElementById("timelineEventos");
+                    cont.innerHTML = "";
+                    if (!eventos || !eventos.length) {
+                        cont.innerHTML = `<div class="text-center text-muted">Sin eventos registrados aún.</div>`;
+                        return;
+                    }
+                    eventos.forEach(ev => {
+                        cont.innerHTML += `
+                            <div class="d-flex align-items-center mb-2">
+                                <span class="me-2">
+                                    <i class="mdi ${ev.icono} fs-4"></i>
+                                </span>
+                                <span class="fw-medium">${ev.descripcion}</span>
+                                <span class="ms-auto text-muted small">${ev.hora}</span>
+                                ${ev.obs ? `<span class="ms-2 small text-muted">(${ev.obs})</span>` : ""}
+                            </div>`;
+                    });
+                });
+        });
+
+        // Captura IP + geolocalización
+        async function obtenerDatosUbicacion() {
+            let ip = "";
+            try {
+                const res = await fetch("https://api.ipify.org?format=json");
+                ip = (await res.json()).ip;
+            } catch { ip = ""; }
+            function obtenerUbicacion() {
+                return new Promise(resolve => {
+                    if (!navigator.geolocation) return resolve({ lat: null, lng: null });
+                    navigator.geolocation.getCurrentPosition(
+                        pos => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+                        () => resolve({ lat: null, lng: null }),
+                        { enableHighAccuracy: true, timeout: 5000 }
+                    );
+                });
+            }
+            const ubic = await obtenerUbicacion();
+            return { ip, lat: ubic.lat, lng: ubic.lng };
+        }
+
+        // Registrar llegada (inicio de jornada)
+        document.addEventListener("DOMContentLoaded", function () {
+            var form = document.getElementById('formRegistrarLlegada');
+            if (form) {
+                form.addEventListener('submit', async function (e) {
+                    e.preventDefault();
+                    const tipoJornada = document.querySelector('input[name="tipoJornada"]:checked').value;
+
+                    document.getElementById('btnRegistrarLlegada').disabled = true;
+                    document.getElementById('btnText').style.display = "none";
+                    document.getElementById('btnSpinner').style.display = "inline-block";
+
+                    const datos = await obtenerDatosUbicacion();
+
+                    const response = await fetch('@Url.Action("RegistrarLlegada", "Jornada")', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            tipoJornada: tipoJornada,
+                            ip: datos.ip,
+                            latitud: datos.lat,
+                            longitud: datos.lng
+                        })
+                    });
+                    const result = await response.json();
+                    document.getElementById('btnRegistrarLlegada').disabled = false;
+                    document.getElementById('btnText').style.display = "inline";
+                    document.getElementById('btnSpinner').style.display = "none";
+
+                    if (response.ok && result.success) {
+                        window.location.reload();
+                    } else {
+                        showToast(result.mensaje || 'No se pudo registrar la llegada.');
+                    }
+                });
+            }
+
+            // Botón almuerzo
+            document.getElementById('btnAlmuerzo').addEventListener('click', async function () {
+                const datos = await obtenerDatosUbicacion();
+                await registrarEvento('almuerzo_inicio', '', datos);
+            });
+
+            // Botón break
+            document.getElementById('btnBreak').addEventListener('click', async function () {
+                const datos = await obtenerDatosUbicacion();
+                await registrarEvento('break_inicio', '', datos);
+            });
+
+            // Botón salida
+            document.getElementById('btnSalida').addEventListener('click', async function () {
+                const datos = await obtenerDatosUbicacion();
+                await registrarEvento('salida', '', datos);
+            });
+
+            // Botón acciones extra
+            document.getElementById('btnRegistrarExtra').addEventListener('click', async function () {
+                const tipo = document.getElementById('extraTipoEvento').value;
+                const obs = document.getElementById('extraObservaciones').value;
+                const datos = await obtenerDatosUbicacion();
+                await registrarEvento(tipo, obs, datos);
+                var modal = bootstrap.Modal.getInstance(document.getElementById('modalExtras'));
+                modal.hide();
+            });
+        });
+
+        // Registrar evento (cualquier tipo)
+        async function registrarEvento(tipoEvento, observaciones, datos) {
+            const response = await fetch('@Url.Action("RegistrarEvento", "Jornada")', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    tipoEventoCodigo: tipoEvento,
+                    observaciones: observaciones,
+                    ip: datos.ip,
+                    latitud: datos.lat,
+                    longitud: datos.lng
+                })
+            });
+            const result = await response.json();
+            if (response.ok && result.success) {
+                showToast(result.mensaje, "success");
+                setTimeout(() => window.location.reload(), 700);
+            } else {
+                showToast(result.mensaje || "No se pudo registrar el evento.");
+            }
+        }
+
+        // Toast helper
+        function showToast(message, type = 'danger') {
+            const toastId = 'toast-' + Date.now();
+            const toastHtml = `
+                <div id="${toastId}" class="toast align-items-center text-bg-${type} border-0 show" role="alert" aria-live="assertive" aria-atomic="true">
+                    <div class="d-flex">
+                        <div class="toast-body">${message}</div>
+                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                    </div>
+                </div>
+            `;
+            const container = document.getElementById('toastContainer');
+            container.insertAdjacentHTML('beforeend', toastHtml);
+            const toastEl = document.getElementById(toastId);
+            new bootstrap.Toast(toastEl, { delay: 4000 }).show();
+        }
+    </script>
+}
