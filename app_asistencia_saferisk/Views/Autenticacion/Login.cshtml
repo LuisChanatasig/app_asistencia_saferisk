@@ -13,7 +13,8 @@
     <link href="~/assets/css/icons.min.css" rel="stylesheet" />
     <link href="~/assets/css/app.min.css" rel="stylesheet" />
     <link href="~/assets/css/custom.min.css" rel="stylesheet" />
-
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#2162d5">
     <style>
         #toastContainer {
             position: fixed;
@@ -134,6 +135,18 @@
                 showToast(result.mensaje || 'Error al iniciar sesión.');
             }
         });
+
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function () {
+                navigator.serviceWorker.register('/service-worker.js')
+                    .then(function (registration) {
+                        console.log('Service Worker registrado con éxito:', registration.scope);
+                    })
+                    .catch(function (error) {
+                        console.log('Error al registrar el Service Worker:', error);
+                    });
+            });
+        }
     </script>
 </body>
 </html>

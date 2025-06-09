@@ -9,10 +9,12 @@ namespace app_asistencia_saferisk.Controllers
     public class AutenticacionController : Controller
     {
         private readonly AutenticacionService _usuarioService;
+        private readonly JornadaService _jornadaService;
 
-        public AutenticacionController(AutenticacionService usuarioService)
+        public AutenticacionController(AutenticacionService usuarioService,JornadaService jornadaService)
         {
             _usuarioService = usuarioService;
+            _jornadaService = jornadaService;
         }
 
         [HttpGet]
@@ -20,7 +22,6 @@ namespace app_asistencia_saferisk.Controllers
         {
             return View();
         }
-
 
         [HttpPost]
         public async Task<IActionResult> Validar([FromBody] LoginR model)
@@ -34,23 +35,41 @@ namespace app_asistencia_saferisk.Controllers
                 if (user.SupervisorId.HasValue)
                     HttpContext.Session.SetInt32("SupervisorId", user.SupervisorId.Value);
 
-                // Determina la URL de redirección según el RolId
+                // Consultar el estado de la jornada de hoy
+                var jornadaEstado = await _jornadaService.ObtenerEstadoJornadaHoyAsync(user.UsuarioId);
+
                 string redirectUrl;
-                switch (user.RolId)
+                if (jornadaEstado != null && jornadaEstado.Estado == "Presente")
                 {
-                    case 3: // Empleado
-                    case 4: // Sistemas
+                    if (!string.IsNullOrEmpty(jornadaEstado.TipoJornada) &&
+                        jornadaEstado.TipoJornada.Equals("horas_extra", StringComparison.OrdinalIgnoreCase))
+                    {
+                        redirectUrl = Url.Action("Registrar", "HorasExtra");
+                    }
+                    else
+                    {
                         redirectUrl = Url.Action("Index", "Home");
-                        break;
-                    case 1: // Gerencia
-                    case 2: // Supervisor de área
-                    case 5: // Contabilidad
-                    case 7: // Administrador
-                        redirectUrl = Url.Action("Panel", "Dashboard"); // ¡Ajusta a tu pantalla destino!
-                        break;
-                    default:
-                        redirectUrl = Url.Action("Index", "Home"); // Redirige por defecto
-                        break;
+                    }
+                }
+                else
+                {
+                    // Aquí puedes poner más lógica por rol si quieres, por defecto redirige al Home normal
+                    switch (user.RolId)
+                    {
+                        case 3: // Empleado
+                        case 4: // Sistemas
+                            redirectUrl = Url.Action("Index", "Home");
+                            break;
+                        case 1: // Gerencia
+                        case 2: // Supervisor de área
+                        case 5: // Contabilidad
+                        case 7: // Administrador
+                            redirectUrl = Url.Action("Panel", "Dashboard");
+                            break;
+                        default:
+                            redirectUrl = Url.Action("Index", "Home");
+                            break;
+                    }
                 }
 
                 return Json(new { success = true, redirectUrl });

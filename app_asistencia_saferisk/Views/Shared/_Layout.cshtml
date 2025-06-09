@@ -4,6 +4,9 @@
     @await Html.PartialAsync("~/Views/Shared/_title_meta.cshtml")
     @RenderSection("styles", required: false)
     @await Html.PartialAsync("~/Views/Shared/_head_css.cshtml")
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#2162d5">
+
 </head>
 <body>
     <!-- Begin page -->
@@ -30,6 +33,21 @@
     @Html.Partial("~/Views/Shared/_customizer.cshtml") *@
 
     @await Html.PartialAsync("~/Views/Shared/_vendor_scripts.cshtml")
+
+    <script>
+                if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function () {
+                navigator.serviceWorker.register('/service-worker.js')
+                    .then(function (registration) {
+                        console.log('Service Worker registrado con éxito:', registration.scope);
+                    })
+                    .catch(function (error) {
+                        console.log('Error al registrar el Service Worker:', error);
+                    });
+            });
+        }
+
+    </script>
 
     @RenderSection("scripts", required: false)
 </body>

@@ -1,0 +1,298 @@
+﻿@{
+    ViewBag.Title = "Horas Extra";
+}
+@section Styles {
+    <link href="~/css/Jornada.css" rel="stylesheet" />
+}
+<div class="container-xxl py-5">
+    <div class="row justify-content-center mb-4">
+        <div class="col-lg-8 text-center">
+            <h2 class="fw-semibold mb-1">
+                <i class="mdi mdi-timer-plus text-warning me-2"></i>
+                Horas Extra
+            </h2>
+            <p class="lead text-muted">Registra tus eventos de la jornada extra.</p>
+        </div>
+    </div>
+    <div class="row justify-content-center g-4">
+        <div class="col-xl-5 col-lg-6">
+            <div class="card card-animate shadow rounded-4">
+                <div class="card-body py-4 text-center">
+                    <div id="alertEstadoHorasExtra" class="mb-3"></div>
+                    <div class="d-flex flex-wrap gap-3 justify-content-center mt-3" id="accionesHorasExtra">
+                        <!-- Botones generados por JS -->
+                    </div>
+                    <a href="@Url.Action("Index", "Home")" class="btn btn-link mt-3">Volver al inicio</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-5 col-lg-6">
+            <div class="card shadow rounded-4 h-100">
+                <div class="card-body py-4">
+                    <h5 class="fw-semibold mb-3">
+                        <i class="mdi mdi-timeline-clock-outline text-warning me-2"></i>
+                        Timeline Horas Extra
+                    </h5>
+                    <div id="timelineHorasExtra">
+                        <div class="text-center py-4 text-muted">
+                            <i class="mdi mdi-progress-clock mdi-36px mb-2"></i>
+                            <br />
+                            Cargando eventos de horas extra...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para acciones extra -->
+<div class="modal fade" id="modalExtras" tabindex="-1" aria-labelledby="modalExtrasLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalExtrasLabel">Registrar acción extra</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <select class="form-select" id="extraTipoEvento">
+                        <option value="permiso">Permiso especial</option>
+                        <option value="reunion">Reunión</option>
+                        <option value="visita">Visita cliente</option>
+                        <option value="otro">Otro</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Observaciones</label>
+                    <input type="text" class="form-control" id="extraObservaciones" placeholder="Detalle de la acción">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="btnRegistrarExtra">Registrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+<div id="toastContainer"></div>
+
+@section Scripts {
+    <script>
+        let estadoHorasExtra = "noIniciado"; // "noIniciado", "enCurso", "finalizado"
+        let almuerzoExtra = "noIniciado"; // "noIniciado", "enCurso", "finalizado"
+        let jornadaHorasExtraId = null; // <-- importante: identifica la jornada abierta
+
+        document.addEventListener("DOMContentLoaded", function () {
+            consultarEstadoHorasExtra();
+            cargarTimelineHorasExtra();
+
+            // Acciones extra modal
+            document.getElementById('btnRegistrarExtra').addEventListener('click', async function () {
+                const tipo = document.getElementById('extraTipoEvento').value;
+                const obs = document.getElementById('extraObservaciones').value;
+                if (tipo === "otro" && !obs.trim()) {
+                    showToast("Por favor, agrega una observación para la acción 'Otro'.", "warning");
+                    return;
+                }
+                const datos = await obtenerDatosUbicacion();
+                await registrarEventoHorasExtra(tipo, obs, datos, function (ok) {
+                    if (ok) {
+                        showToast("¡Acción extra registrada!", "info");
+                        consultarEstadoHorasExtra();
+                        cargarTimelineHorasExtra();
+                        var modal = bootstrap.Modal.getInstance(document.getElementById('modalExtras'));
+                        modal.hide();
+                    }
+                });
+            });
+        });
+
+        function consultarEstadoHorasExtra() {
+            fetch('@Url.Action("EstadoHorasExtraHoy", "HorasExtra")')
+                .then(res => res.json())
+                .then(data => {
+                    estadoHorasExtra = data.estado ?? "noIniciado";
+                    almuerzoExtra = data.almuerzo ?? "noIniciado";
+                    jornadaHorasExtraId = data.jornadaId ?? null; // <-- IMPORTANTE!
+                    actualizarBotonesHorasExtra();
+                    let msg = "";
+                    if (estadoHorasExtra === "noIniciado")
+                        msg = `<div class="alert alert-info">No has iniciado horas extra.</div>`;
+                    else if (estadoHorasExtra === "enCurso")
+                        msg = `<div class="alert alert-warning">Horas extra en curso.</div>`;
+                    else if (estadoHorasExtra === "finalizado")
+                        msg = `<div class="alert alert-success">Horas extra finalizadas hoy.</div>`;
+                    document.getElementById("alertEstadoHorasExtra").innerHTML = msg;
+                });
+            cargarTimelineHorasExtra();
+        }
+
+        function actualizarBotonesHorasExtra() {
+            const cont = document.getElementById("accionesHorasExtra");
+            cont.innerHTML = "";
+            if (estadoHorasExtra === "noIniciado") {
+                cont.innerHTML = `
+                    <button class="btn btn-success btn-lg" id="btnInicioHorasExtra">
+                        <i class="mdi mdi-play me-1"></i> Iniciar Horas Extra
+                    </button>
+                `;
+                document.getElementById("btnInicioHorasExtra").onclick = async function () {
+                    await registrarEventoHorasExtra("horas_extra_inicio");
+                };
+            } else if (estadoHorasExtra === "enCurso") {
+                cont.innerHTML = `
+                    <button class="btn btn-warning btn-lg" id="btnAlmuerzoHorasExtra">
+                        <i class="mdi mdi-silverware-fork-knife me-1"></i> ${almuerzoExtra === "enCurso" ? "Fin de Almuerzo" : "Almuerzo Horas Extra"}
+                    </button>
+                    <button class="btn btn-danger btn-lg" id="btnFinHorasExtra">
+                        <i class="mdi mdi-stop me-1"></i> Finalizar Horas Extra
+                    </button>
+                    <button class="btn btn-secondary btn-lg" id="btnExtras" data-bs-toggle="modal" data-bs-target="#modalExtras">
+                        <i class="mdi mdi-dots-horizontal me-1"></i> Acciones Extra
+                    </button>
+                `;
+                // Botón almuerzo
+                document.getElementById("btnAlmuerzoHorasExtra").onclick = async function () {
+                    if (almuerzoExtra === "noIniciado") {
+                        await registrarEventoHorasExtra("almuerzo_inicio_horas_extra");
+                    } else if (almuerzoExtra === "enCurso") {
+                        await registrarEventoHorasExtra("almuerzo_fin_horas_extra");
+                    }
+                };
+                // Botón fin de horas extra
+                            document.getElementById("btnFinHorasExtra").onclick = async function () {
+            await registrarEventoHorasExtra("horas_extra_fin", "", null, async function (ok) {
+                console.log("Jornada extra ID antes de cerrar:", jornadaHorasExtraId);
+                if (ok && jornadaHorasExtraId) {
+                    try {
+                        const res = await fetch('@Url.Action("CerrarJornadaExtra", "Jornada")', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ jornadaId: jornadaHorasExtraId })
+                        });
+                        const result = await res.json();
+
+                        if (res.ok && result.success) {
+                            showToast("¡Horas extra finalizadas y cerradas! 🏁", "primary");
+                            consultarEstadoHorasExtra();
+                        } else {
+                            showToast(result.mensaje || "Error al cerrar las horas extra.", "danger");
+                        }
+                    } catch (e) {
+                        showToast("No se pudo cerrar las horas extra.", "danger");
+                    }
+                } else {
+                    showToast("No hay jornada extra activa o ID no encontrado.", "danger");
+                }
+            });
+        };
+
+            }
+            // Si finalizado, no muestra botones (sólo mensaje)
+        }
+
+        async function registrarEventoHorasExtra(tipoEvento, obs = "", datosManual = null, callback) {
+            const datos = datosManual || await obtenerDatosUbicacion();
+            const response = await fetch('@Url.Action("RegistrarEventoHorasExtra", "HorasExtra")', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    tipoEvento: tipoEvento,
+                    observaciones: obs,
+                    ip: datos.ip,
+                    latitud: datos.lat,
+                    longitud: datos.lng
+                })
+            });
+            const result = await response.json();
+            if (response.ok && result.success) {
+                showToast(result.mensaje || '¡Evento registrado!', 'success');
+                consultarEstadoHorasExtra();
+                cargarTimelineHorasExtra();
+                if (typeof callback === "function") callback(true);
+            } else {
+                showToast(result.mensaje || 'No se pudo registrar el evento.');
+                if (typeof callback === "function") callback(false);
+            }
+        }
+
+        function cargarTimelineHorasExtra() {
+            const cont = document.getElementById("timelineHorasExtra");
+            if (!cont) return;
+            cont.innerHTML = `<div class="text-center py-4 text-muted">
+                <i class="mdi mdi-progress-clock mdi-36px mb-2"></i>
+                <br />Cargando eventos de horas extra...
+            </div>`;
+
+            fetch('@Url.Action("TimelineHoy", "Jornada")')
+                .then(res => res.json())
+                .then(eventos => {
+                    cont.innerHTML = "";
+                    if (!eventos || !eventos.length) {
+                        cont.innerHTML = `<div class="text-center text-muted">Sin eventos registrados aún.</div>`;
+                        return;
+                    }
+                    eventos.forEach(ev => {
+                        cont.innerHTML += `
+                            <div class="d-flex align-items-center mb-2">
+                                <span class="me-2">
+                                    <i class="mdi ${ev.icono} fs-4"></i>
+                                </span>
+                                <span class="fw-medium">${ev.descripcion}</span>
+                                <span class="ms-auto text-muted small">${ev.hora}</span>
+                                ${ev.obs ? `<span class="ms-2 small text-muted">(${ev.obs})</span>` : ""}
+                            </div>`;
+                    });
+                });
+        }
+
+        // Helper: IP + geolocalización
+        async function obtenerDatosUbicacion() {
+            let ip = "";
+            try {
+                const res = await fetch("https://api.ipify.org?format=json");
+                ip = (await res.json()).ip;
+            } catch { ip = ""; }
+            function obtenerUbicacion() {
+                return new Promise(resolve => {
+                    if (!navigator.geolocation) return resolve({ lat: null, lng: null });
+                    navigator.geolocation.getCurrentPosition(
+                        pos => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+                        () => resolve({ lat: null, lng: null }),
+                        { enableHighAccuracy: true, timeout: 5000 }
+                    );
+                });
+            }
+            const ubic = await obtenerUbicacion();
+            return { ip, lat: ubic.lat, lng: ubic.lng };
+        }
+
+        // Toast helper
+        function showToast(message, type = 'danger') {
+            const colorClass = {
+                success: 'text-bg-success',
+                info: 'text-bg-info',
+                warning: 'text-bg-warning',
+                primary: 'text-bg-primary',
+                danger: 'text-bg-danger'
+            }[type] || 'text-bg-danger';
+
+            const toastId = 'toast-' + Date.now();
+            const toastHtml = `
+                <div id="${toastId}" class="toast align-items-center ${colorClass} border-0 show" role="alert" aria-live="assertive" aria-atomic="true">
+                    <div class="d-flex">
+                        <div class="toast-body">${message}</div>
+                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                    </div>
+                </div>
+            `;
+            const container = document.getElementById('toastContainer');
+            container.insertAdjacentHTML('beforeend', toastHtml);
+            const toastEl = document.getElementById(toastId);
+            new bootstrap.Toast(toastEl, { delay: 4000 }).show();
+        }
+    </script>
+}
+
+

@@ -1,7 +1,14 @@
 ﻿@using app_asistencia_saferisk.Helper
+
 @{
     ViewBag.Title = "Inicio";
     var nombres = UsuarioSesionHelper.Nombres(Context);
+
+}
+@section Styles {
+
+    <link href="~/css/Jornada.css" rel="stylesheet" />
+
 }
 
 <div class="container-xxl py-5">
@@ -51,6 +58,13 @@
                                     <span id="btnText"><i class="mdi mdi-login-variant me-1"></i> Registrar Llegada</span>
                                     <span id="btnSpinner" class="spinner-border spinner-border-sm ms-2" style="display:none"></span>
                                 </button>
+                                <!-- Nuevo botón, SIEMPRE visible -->
+                                <div class="d-flex justify-content-center mt-3">
+                                    <button type="button" class="btn btn-warning btn-lg px-4" id="btnRegistrarHorasExtra">
+                                        <i class="mdi mdi-timer-plus me-1"></i> Registrar Horas Extra
+                                    </button>
+                                </div>
+
                             </form>
                         </div>
                     </div>
@@ -66,9 +80,11 @@
                             <button class="btn btn-danger btn-lg" id="btnSalida">
                                 <i class="mdi mdi-logout-variant me-1"></i> Salida
                             </button>
-                            <button class="btn btn-secondary btn-lg" id="btnExtras" data-bs-toggle="modal" data-bs-target="#modalExtras">
+                            <button class="btn btn-secondary btn-lg" id="btnExtras"
+                                    data-bs-toggle="offcanvas" data-bs-target="#offcanvasExtras" type="button">
                                 <i class="mdi mdi-dots-horizontal me-1"></i> Acciones Extra
                             </button>
+
                         </div>
                     </div>
 
@@ -100,36 +116,32 @@
                 </div>
             </div>
         </div>
+
     </div>
 </div>
 
-<!-- Modal para acciones extra -->
-<div class="modal fade" id="modalExtras" tabindex="-1" aria-labelledby="modalExtrasLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="modalExtrasLabel">Registrar otra acción</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
-            </div>
-            <div class="modal-body">
-                <div class="mb-3">
-                    <select class="form-select" id="extraTipoEvento">
-                        <option value="permiso">Permiso especial</option>
-                        <option value="reunion">Reunión</option>
-                        <option value="visita">Visita cliente</option>
-                        <option value="otro">Otro</option>
-                    </select>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Observaciones</label>
-                    <input type="text" class="form-control" id="extraObservaciones" placeholder="Detalle de la acción">
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-primary" id="btnRegistrarExtra">Registrar</button>
-            </div>
+<!-- Offcanvas Lateral para Acciones Extra -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="offcanvasExtras" aria-labelledby="offcanvasExtrasLabel">
+    <div class="offcanvas-header">
+        <h5 class="offcanvas-title" id="offcanvasExtrasLabel">Registrar Acción Extra</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Cerrar"></button>
+    </div>
+    <div class="offcanvas-body">
+        <div class="mb-3 d-grid gap-2">
+            <button type="button" class="btn btn-outline-primary btn-lg" data-tipo="permiso">Permiso especial</button>
+            <button type="button" class="btn btn-outline-success btn-lg" data-tipo="reunion">Reunión</button>
+            <button type="button" class="btn btn-outline-warning btn-lg" data-tipo="visita">Visita cliente</button>
+            <button type="button" class="btn btn-outline-secondary btn-lg" data-tipo="traslado">Traslado</button>
+            <button type="button" class="btn btn-outline-dark btn-lg" data-tipo="otro">Otro</button>
         </div>
+        <div class="mb-3" id="campoObservacion" style="display:none;">
+            <label class="form-label">Observaciones</label>
+            <input type="text" class="form-control" id="extraObservaciones" placeholder="Detalle de la acción">
+        </div>
+    </div>
+    <div class="offcanvas-footer d-flex justify-content-end p-3">
+        <button type="button" class="btn btn-secondary me-2" data-bs-dismiss="offcanvas">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="btnRegistrarExtra" disabled>Registrar</button>
     </div>
 </div>
 
@@ -138,8 +150,191 @@
 
 @section Scripts {
     <script>
-        // Cargar estado y timeline, controlar qué se muestra
+        let estadoAlmuerzo = "noIniciado"; // "noIniciado", "enCurso", "finalizado"
+        let estadoBreak = "noIniciado";    // "noIniciado", "enCurso", "finalizado"
+        let jornadaFinalizada = false;
+        let tipoEventoSeleccionado = null;
         document.addEventListener("DOMContentLoaded", function () {
+            actualizarVistaJornada();
+            cargarYActualizarTimeline();
+
+            // Registrar llegada
+            var form = document.getElementById('formRegistrarLlegada');
+            if (form) {
+                form.addEventListener('submit', async function (e) {
+                    e.preventDefault();
+                    const tipoJornada = document.querySelector('input[name="tipoJornada"]:checked').value;
+                    setBtnLoading('btnRegistrarLlegada', true);
+
+                    const datos = await obtenerDatosUbicacion();
+
+                    const response = await fetch('@Url.Action("RegistrarLlegada", "Jornada")', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            tipoJornada: tipoJornada,
+                            ip: datos.ip,
+                            latitud: datos.lat,
+                            longitud: datos.lng
+                        })
+                    });
+                    const result = await response.json();
+                    setBtnLoading('btnRegistrarLlegada', false);
+
+                    if (response.ok && result.success) {
+                        showToast('¡Llegada registrada!', 'success');
+                        actualizarVistaJornada();
+                        cargarYActualizarTimeline();
+                    } else {
+                        showToast(result.mensaje || 'No se pudo registrar la llegada.');
+                    }
+                });
+            }
+
+            // Botón break
+            document.getElementById('btnBreak').addEventListener('click', async function () {
+                if (jornadaFinalizada) return;
+                const btn = this;
+                btn.disabled = true;
+                const datos = await obtenerDatosUbicacion();
+
+                if (estadoBreak === "enCurso") {
+                    await registrarEvento('break_fin', '', datos, function (ok) {
+                        if (ok) showToast("¡Break finalizado! 👏", "success");
+                        else btn.disabled = false;
+                        cargarYActualizarTimeline();
+                    });
+                } else if (estadoBreak === "noIniciado") {
+                    await registrarEvento('break_inicio', '', datos, function (ok) {
+                        if (ok) showToast("¡Disfruta tu break! ☕", "info");
+                        else btn.disabled = false;
+                        cargarYActualizarTimeline();
+                    });
+                }
+            });
+
+                // Botón salida mejorado
+        document.getElementById('btnSalida').addEventListener('click', async function () {
+            if (jornadaFinalizada) return;
+
+            const datos = await obtenerDatosUbicacion();
+
+            await registrarEvento('salida', '', datos, async function (ok) {
+                if (ok) {
+                    // Llama al endpoint para cerrar la jornada
+                    try {
+                        const res = await fetch('@Url.Action("CerrarJornada", "Jornada")', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(jornadaIdActual) // o { jornadaId: jornadaIdActual } si usas un DTO
+                        });
+                        const result = await res.json();
+
+                        if (res.ok && result.success) {
+                            showToast("¡Jornada finalizada y cerrada correctamente! 🏁", "primary");
+                            bloquearBotonesJornada();
+                            cargarYActualizarTimeline();
+                        } else {
+                            showToast(result.mensaje || "Error al cerrar la jornada.", "danger");
+                        }
+                    } catch (e) {
+                        showToast("No se pudo cerrar la jornada.", "danger");
+                    }
+                }
+            });
+        });
+
+
+            // Botón acciones extra
+            document.getElementById('btnRegistrarExtra').addEventListener('click', async function () {
+                const tipo = document.getElementById('extraTipoEvento').value;
+                const obs = document.getElementById('extraObservaciones').value;
+                if (tipo === "otro" && !obs.trim()) {
+                    showToast("Por favor, agrega una observación para la acción 'Otro'.", "warning");
+                    return;
+                }
+                const datos = await obtenerDatosUbicacion();
+                await registrarEvento(tipo, obs, datos, function (ok) {
+                    if (ok) {
+                        showToast("¡Acción extra registrada!", "info");
+                        cargarYActualizarTimeline();
+                        var modal = bootstrap.Modal.getInstance(document.getElementById('modalExtras'));
+                        modal.hide();
+                    }
+                });
+            });
+
+            // Botón almuerzo
+            document.getElementById('btnAlmuerzo').addEventListener('click', async function () {
+                if (jornadaFinalizada) return;
+                const btn = this;
+                btn.disabled = true;
+                const datos = await obtenerDatosUbicacion();
+
+                if (estadoAlmuerzo === "enCurso") {
+                    await registrarEvento('almuerzo_fin', '', datos, function (ok) {
+                        if (ok) showToast("¡Almuerzo finalizado! 👏", "success");
+                        else btn.disabled = false;
+                        cargarYActualizarTimeline();
+                    });
+                } else if (estadoAlmuerzo === "noIniciado") {
+                    await registrarEvento('almuerzo_inicio', '', datos, function (ok) {
+                        if (ok) showToast("¡Buen provecho! 🍽️", "info");
+                        else btn.disabled = false;
+                        cargarYActualizarTimeline();
+                    });
+                }
+            });
+        });
+
+
+        // -- HORAS EXTRA --
+                document.getElementById('btnRegistrarHorasExtra').addEventListener('click', async function () {
+            this.disabled = true;
+            const datos = await obtenerDatosUbicacion();
+
+            // Mandar tipo jornada "horas_extra" o el valor que definas
+            const response = await fetch('@Url.Action("RegistrarLlegadaHorasExtra", "HorasExtra")', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    tipoJornada: "horas_extra",
+                    ip: datos.ip,
+                    latitud: datos.lat,
+                    longitud: datos.lng
+                })
+            });
+
+            const result = await response.json();
+            this.disabled = false;
+            if (response.ok && result.success) {
+                showToast('¡Horas extra registradas!', 'success');
+                // Aquí puedes redirigir o refrescar vista
+                window.location.href = "@Url.Action("Registrar", "HorasExtra")";
+            } else {
+                showToast(result.mensaje || 'No se pudo registrar las horas extra.');
+            }
+        });
+
+        // --- FUNCIONES AUXILIARES ---
+
+        function setBtnLoading(btnId, isLoading) {
+            const btn = document.getElementById(btnId);
+            if (!btn) return;
+            const btnText = document.getElementById('btnText');
+            const btnSpinner = document.getElementById('btnSpinner');
+            if (isLoading) {
+                btn.disabled = true;
+                if (btnText) btnText.style.display = "none";
+                if (btnSpinner) btnSpinner.style.display = "inline-block";
+            } else {
+                btn.disabled = false;
+                if (btnText) btnText.style.display = "inline";
+                if (btnSpinner) btnSpinner.style.display = "none";
+            }
+        }
+
+        function actualizarVistaJornada() {
             fetch('@Url.Action("EstadoActual", "Jornada")')
                 .then(res => res.json())
                 .then(data => {
@@ -152,18 +347,31 @@
                         document.getElementById("accionesJornada").style.display = "block";
                     }
                 });
+        }
+
+        function cargarYActualizarTimeline() {
+            const timelineCont = document.getElementById("timelineEventos");
+            timelineCont.innerHTML = `<div class="text-center py-4 text-muted">
+                <i class="mdi mdi-progress-clock mdi-36px mb-2"></i>
+                <br />Cargando eventos de hoy...
+            </div>`;
 
             fetch('@Url.Action("TimelineHoy", "Jornada")')
                 .then(res => res.json())
                 .then(eventos => {
-                    const cont = document.getElementById("timelineEventos");
-                    cont.innerHTML = "";
+                    timelineCont.innerHTML = "";
+                    jornadaFinalizada = false;
+
                     if (!eventos || !eventos.length) {
-                        cont.innerHTML = `<div class="text-center text-muted">Sin eventos registrados aún.</div>`;
+                        timelineCont.innerHTML = `<div class="text-center text-muted">Sin eventos registrados aún.</div>`;
+                        estadoAlmuerzo = "noIniciado";
+                        estadoBreak = "noIniciado";
+                        actualizarBotonAlmuerzo();
+                        actualizarBotonBreak();
                         return;
                     }
                     eventos.forEach(ev => {
-                        cont.innerHTML += `
+                        timelineCont.innerHTML += `
                             <div class="d-flex align-items-center mb-2">
                                 <span class="me-2">
                                     <i class="mdi ${ev.icono} fs-4"></i>
@@ -172,11 +380,191 @@
                                 <span class="ms-auto text-muted small">${ev.hora}</span>
                                 ${ev.obs ? `<span class="ms-2 small text-muted">(${ev.obs})</span>` : ""}
                             </div>`;
+                        // Detectar si ya hay salida registrada
+                        if (ev.descripcion && ev.descripcion.toLowerCase().includes("salida")) {
+                            jornadaFinalizada = true;
+                        }
                     });
-                });
-        });
 
-        // Captura IP + geolocalización
+                    // Detectar últimos estados de almuerzo y break
+                    let lastAlmuerzo = null;
+                    let lastBreak = null;
+                    for (let i = eventos.length - 1; i >= 0; i--) {
+                        if (
+                            eventos[i].descripcion === "Inicio de almuerzo" ||
+                            eventos[i].descripcion === "Fin de almuerzo"
+                        ) {
+                            if (!lastAlmuerzo) lastAlmuerzo = eventos[i].descripcion;
+                        }
+                        if (
+                            eventos[i].descripcion === "Inicio de break" ||
+                            eventos[i].descripcion === "Fin de break"
+                        ) {
+                            if (!lastBreak) lastBreak = eventos[i].descripcion;
+                        }
+                        if (lastAlmuerzo && lastBreak) break;
+                    }
+                    // Estado almuerzo
+                    if (!lastAlmuerzo) {
+                        estadoAlmuerzo = "noIniciado";
+                    } else if (lastAlmuerzo === "Inicio de almuerzo") {
+                        estadoAlmuerzo = "enCurso";
+                    } else if (lastAlmuerzo === "Fin de almuerzo") {
+                        estadoAlmuerzo = "finalizado";
+                    }
+                    // Estado break
+                    if (!lastBreak) {
+                        estadoBreak = "noIniciado";
+                    } else if (lastBreak === "Inicio de break") {
+                        estadoBreak = "enCurso";
+                    } else if (lastBreak === "Fin de break") {
+                        estadoBreak = "finalizado";
+                    }
+                    actualizarBotonAlmuerzo();
+                    actualizarBotonBreak();
+
+                    if (jornadaFinalizada) {
+                        bloquearBotonesJornada();
+                    }
+                });
+        }
+
+        function bloquearBotonesJornada() {
+            const btnAlmuerzo = document.getElementById('btnAlmuerzo');
+            const btnBreak = document.getElementById('btnBreak');
+            const btnSalida = document.getElementById('btnSalida');
+            if (btnAlmuerzo) {
+                btnAlmuerzo.disabled = true;
+                btnAlmuerzo.classList.remove("btn-warning", "btn-success");
+                btnAlmuerzo.classList.add("btn-secondary");
+                btnAlmuerzo.innerHTML = `<i class="mdi mdi-lock me-1"></i> Jornada finalizada`;
+            }
+            if (btnBreak) {
+                btnBreak.disabled = true;
+                btnBreak.classList.remove("btn-info", "btn-success");
+                btnBreak.classList.add("btn-secondary");
+                btnBreak.innerHTML = `<i class="mdi mdi-lock me-1"></i> Jornada finalizada`;
+            }
+            if (btnSalida) {
+                btnSalida.disabled = true;
+                btnSalida.classList.remove("btn-danger");
+                btnSalida.classList.add("btn-secondary");
+                btnSalida.innerHTML = `<i class="mdi mdi-lock me-1"></i> Jornada finalizada`;
+            }
+            // El botón de Acciones Extra (btnExtras) NO se toca: sigue activo
+        }
+
+        function actualizarBotonAlmuerzo() {
+            const btnAlmuerzo = document.getElementById('btnAlmuerzo');
+            const btnBreak = document.getElementById('btnBreak');
+            if (!btnAlmuerzo) return;
+
+            if (jornadaFinalizada) {
+                btnAlmuerzo.disabled = true;
+                btnAlmuerzo.classList.remove("btn-warning", "btn-success");
+                btnAlmuerzo.classList.add("btn-secondary");
+                btnAlmuerzo.innerHTML = `<i class="mdi mdi-lock me-1"></i> Jornada finalizada`;
+                return;
+            }
+
+            if (estadoAlmuerzo === "enCurso") {
+                btnAlmuerzo.innerHTML = `<i class="mdi mdi-food me-1"></i> Fin de Almuerzo`;
+                btnAlmuerzo.classList.remove("btn-warning");
+                btnAlmuerzo.classList.add("btn-success");
+                btnAlmuerzo.disabled = false;
+                if (btnBreak) {
+                    btnBreak.disabled = true;
+                    btnBreak.innerHTML = `<i class="mdi mdi-coffee-off-outline me-1"></i> No disponible en almuerzo`;
+                    btnBreak.classList.remove("btn-success", "btn-info");
+                    btnBreak.classList.add("btn-secondary");
+                }
+            } else if (estadoAlmuerzo === "noIniciado") {
+                btnAlmuerzo.innerHTML = `<i class="mdi mdi-silverware-fork-knife me-1"></i> Almuerzo`;
+                btnAlmuerzo.classList.remove("btn-success");
+                btnAlmuerzo.classList.add("btn-warning");
+                if (estadoBreak !== "enCurso") {
+                    btnAlmuerzo.disabled = false;
+                } else {
+                    btnAlmuerzo.disabled = true;
+                    btnAlmuerzo.innerHTML = `<i class="mdi mdi-silverware-fork-knife-off me-1"></i> No disponible en break`;
+                    btnAlmuerzo.classList.remove("btn-warning", "btn-success");
+                    btnAlmuerzo.classList.add("btn-secondary");
+                }
+            } else if (estadoAlmuerzo === "finalizado") {
+                btnAlmuerzo.innerHTML = `<i class="mdi mdi-silverware-fork-knife-off me-1"></i> Almuerzo finalizado`;
+                btnAlmuerzo.classList.remove("btn-warning", "btn-success");
+                btnAlmuerzo.classList.add("btn-secondary");
+                btnAlmuerzo.disabled = true;
+            }
+        }
+
+        function actualizarBotonBreak() {
+            const btnBreak = document.getElementById('btnBreak');
+            const btnAlmuerzo = document.getElementById('btnAlmuerzo');
+            if (!btnBreak) return;
+
+            if (jornadaFinalizada) {
+                btnBreak.disabled = true;
+                btnBreak.classList.remove("btn-info", "btn-success");
+                btnBreak.classList.add("btn-secondary");
+                btnBreak.innerHTML = `<i class="mdi mdi-lock me-1"></i> Jornada finalizada`;
+                return;
+            }
+
+            if (estadoBreak === "enCurso") {
+                btnBreak.innerHTML = `<i class="mdi mdi-coffee me-1"></i> Fin de Break`;
+                btnBreak.classList.remove("btn-info");
+                btnBreak.classList.add("btn-success");
+                btnBreak.disabled = false;
+                if (btnAlmuerzo) {
+                    btnAlmuerzo.disabled = true;
+                    btnAlmuerzo.innerHTML = `<i class="mdi mdi-silverware-fork-knife-off me-1"></i> No disponible en break`;
+                    btnAlmuerzo.classList.remove("btn-warning", "btn-success");
+                    btnAlmuerzo.classList.add("btn-secondary");
+                }
+            } else if (estadoBreak === "noIniciado") {
+                btnBreak.innerHTML = `<i class="mdi mdi-coffee-outline me-1"></i> Break`;
+                btnBreak.classList.remove("btn-success");
+                btnBreak.classList.add("btn-info");
+                if (estadoAlmuerzo !== "enCurso") {
+                    btnBreak.disabled = false;
+                } else {
+                    btnBreak.disabled = true;
+                    btnBreak.innerHTML = `<i class="mdi mdi-coffee-off-outline me-1"></i> No disponible en almuerzo`;
+                    btnBreak.classList.remove("btn-info", "btn-success");
+                    btnBreak.classList.add("btn-secondary");
+                }
+            } else if (estadoBreak === "finalizado") {
+                btnBreak.innerHTML = `<i class="mdi mdi-coffee-off-outline me-1"></i> Break finalizado`;
+                btnBreak.classList.remove("btn-info", "btn-success");
+                btnBreak.classList.add("btn-secondary");
+                btnBreak.disabled = true;
+            }
+        }
+
+        // Registrar evento (cualquier tipo)
+        async function registrarEvento(tipoEvento, observaciones, datos, callback) {
+            const response = await fetch('@Url.Action("RegistrarEvento", "Jornada")', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    tipoEventoCodigo: tipoEvento,
+                    observaciones: observaciones,
+                    ip: datos.ip,
+                    latitud: datos.lat,
+                    longitud: datos.lng
+                })
+            });
+            const result = await response.json();
+            if (response.ok && result.success) {
+                if (typeof callback === "function") callback(true);
+            } else {
+                if (typeof callback === "function") callback(false);
+                showToast(result.mensaje || "No se pudo registrar el evento.");
+            }
+        }
+
+        // Helper: IP + geolocalización
         async function obtenerDatosUbicacion() {
             let ip = "";
             try {
@@ -197,99 +585,19 @@
             return { ip, lat: ubic.lat, lng: ubic.lng };
         }
 
-        // Registrar llegada (inicio de jornada)
-        document.addEventListener("DOMContentLoaded", function () {
-            var form = document.getElementById('formRegistrarLlegada');
-            if (form) {
-                form.addEventListener('submit', async function (e) {
-                    e.preventDefault();
-                    const tipoJornada = document.querySelector('input[name="tipoJornada"]:checked').value;
-
-                    document.getElementById('btnRegistrarLlegada').disabled = true;
-                    document.getElementById('btnText').style.display = "none";
-                    document.getElementById('btnSpinner').style.display = "inline-block";
-
-                    const datos = await obtenerDatosUbicacion();
-
-                    const response = await fetch('@Url.Action("RegistrarLlegada", "Jornada")', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            tipoJornada: tipoJornada,
-                            ip: datos.ip,
-                            latitud: datos.lat,
-                            longitud: datos.lng
-                        })
-                    });
-                    const result = await response.json();
-                    document.getElementById('btnRegistrarLlegada').disabled = false;
-                    document.getElementById('btnText').style.display = "inline";
-                    document.getElementById('btnSpinner').style.display = "none";
-
-                    if (response.ok && result.success) {
-                        window.location.reload();
-                    } else {
-                        showToast(result.mensaje || 'No se pudo registrar la llegada.');
-                    }
-                });
-            }
-
-            // Botón almuerzo
-            document.getElementById('btnAlmuerzo').addEventListener('click', async function () {
-                const datos = await obtenerDatosUbicacion();
-                await registrarEvento('almuerzo_inicio', '', datos);
-            });
-
-            // Botón break
-            document.getElementById('btnBreak').addEventListener('click', async function () {
-                const datos = await obtenerDatosUbicacion();
-                await registrarEvento('break_inicio', '', datos);
-            });
-
-            // Botón salida
-            document.getElementById('btnSalida').addEventListener('click', async function () {
-                const datos = await obtenerDatosUbicacion();
-                await registrarEvento('salida', '', datos);
-            });
-
-            // Botón acciones extra
-            document.getElementById('btnRegistrarExtra').addEventListener('click', async function () {
-                const tipo = document.getElementById('extraTipoEvento').value;
-                const obs = document.getElementById('extraObservaciones').value;
-                const datos = await obtenerDatosUbicacion();
-                await registrarEvento(tipo, obs, datos);
-                var modal = bootstrap.Modal.getInstance(document.getElementById('modalExtras'));
-                modal.hide();
-            });
-        });
-
-        // Registrar evento (cualquier tipo)
-        async function registrarEvento(tipoEvento, observaciones, datos) {
-            const response = await fetch('@Url.Action("RegistrarEvento", "Jornada")', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    tipoEventoCodigo: tipoEvento,
-                    observaciones: observaciones,
-                    ip: datos.ip,
-                    latitud: datos.lat,
-                    longitud: datos.lng
-                })
-            });
-            const result = await response.json();
-            if (response.ok && result.success) {
-                showToast(result.mensaje, "success");
-                setTimeout(() => window.location.reload(), 700);
-            } else {
-                showToast(result.mensaje || "No se pudo registrar el evento.");
-            }
-        }
-
         // Toast helper
         function showToast(message, type = 'danger') {
+            const colorClass = {
+                success: 'text-bg-success',
+                info: 'text-bg-info',
+                warning: 'text-bg-warning',
+                primary: 'text-bg-primary',
+                danger: 'text-bg-danger'
+            }[type] || 'text-bg-danger';
+
             const toastId = 'toast-' + Date.now();
             const toastHtml = `
-                <div id="${toastId}" class="toast align-items-center text-bg-${type} border-0 show" role="alert" aria-live="assertive" aria-atomic="true">
+                <div id="${toastId}" class="toast align-items-center ${colorClass} border-0 show" role="alert" aria-live="assertive" aria-atomic="true">
                     <div class="d-flex">
                         <div class="toast-body">${message}</div>
                         <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
@@ -301,5 +609,58 @@
             const toastEl = document.getElementById(toastId);
             new bootstrap.Toast(toastEl, { delay: 4000 }).show();
         }
+                
+
+        document.querySelectorAll('#offcanvasExtras .btn[data-tipo]').forEach(btn => {
+            btn.addEventListener('click', function () {
+                tipoEventoSeleccionado = this.getAttribute('data-tipo');
+                // Estilo visual de selección
+                document.querySelectorAll('#offcanvasExtras .btn[data-tipo]').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+
+                // Mostrar observación SOLO si es "otro" o "traslado"
+                if (tipoEventoSeleccionado === 'otro' || tipoEventoSeleccionado === 'traslado') {
+                    document.getElementById('campoObservacion').style.display = 'block';
+                    document.getElementById('extraObservaciones').focus();
+                } else {
+                    document.getElementById('campoObservacion').style.display = 'none';
+                    document.getElementById('extraObservaciones').value = '';
+                }
+                // Habilita el botón registrar
+                document.getElementById('btnRegistrarExtra').disabled = false;
+            });
+        });
+
+        // Registrar acción
+        document.getElementById('btnRegistrarExtra').addEventListener('click', async function () {
+            if (!tipoEventoSeleccionado) return;
+
+            let observacion = document.getElementById('extraObservaciones').value;
+            if ((tipoEventoSeleccionado === 'otro' || tipoEventoSeleccionado === 'traslado') && !observacion.trim()) {
+                showToast('Debes ingresar una observación.', 'warning');
+                document.getElementById('extraObservaciones').focus();
+                return;
+            }
+
+            // Aquí va tu lógica de registrar evento...
+            await registrarEventoHorasExtra(tipoEventoSeleccionado, observacion);
+            // Cierra el offcanvas
+            let offcanvasEl = bootstrap.Offcanvas.getInstance(document.getElementById('offcanvasExtras'));
+            offcanvasEl.hide();
+        });
+
+        // Opcional: limpiar selección al abrir el offcanvas
+        document.getElementById('offcanvasExtras').addEventListener('show.bs.offcanvas', function () {
+            tipoEventoSeleccionado = null;
+            document.querySelectorAll('#offcanvasExtras .btn[data-tipo]').forEach(b => b.classList.remove('active'));
+            document.getElementById('campoObservacion').style.display = 'none';
+            document.getElementById('extraObservaciones').value = '';
+            document.getElementById('btnRegistrarExtra').disabled = true;
+        });
+
     </script>
+
 }
+
+
+
