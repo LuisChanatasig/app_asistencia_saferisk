@@ -79,34 +79,27 @@
 
 @section Scripts {
     <script>
-        let estadoHorasExtra = "noIniciado"; // "noIniciado", "enCurso", "finalizado"
-        let almuerzoExtra = "noIniciado"; // "noIniciado", "enCurso", "finalizado"
-        let jornadaHorasExtraId = null; // <-- importante: identifica la jornada abierta
+        let estadoHorasExtra = "noIniciado";
+        let almuerzoExtra = "noIniciado";
 
+        let jornadaHorasExtraId = null;
         document.addEventListener("DOMContentLoaded", function () {
             consultarEstadoHorasExtra();
             cargarTimelineHorasExtra();
 
-            // Acciones extra modal
-            document.getElementById('btnRegistrarExtra').addEventListener('click', async function () {
-                const tipo = document.getElementById('extraTipoEvento').value;
-                const obs = document.getElementById('extraObservaciones').value;
-                if (tipo === "otro" && !obs.trim()) {
-                    showToast("Por favor, agrega una observación para la acción 'Otro'.", "warning");
-                    return;
-                }
-                const datos = await obtenerDatosUbicacion();
-                await registrarEventoHorasExtra(tipo, obs, datos, function (ok) {
-                    if (ok) {
-                        showToast("¡Acción extra registrada!", "info");
-                        consultarEstadoHorasExtra();
-                        cargarTimelineHorasExtra();
-                        var modal = bootstrap.Modal.getInstance(document.getElementById('modalExtras'));
-                        modal.hide();
-                    }
-                });
+            // Limpia modal cada vez que se abre
+            document.getElementById('modalExtras').addEventListener('show.bs.modal', () => {
+                document.getElementById('extraTipoEvento').selectedIndex = 0;
+                document.getElementById('extraObservaciones').value = "";
+                document.getElementById('btnRegistrarExtra').disabled = false;
+                setBtnLoading('btnRegistrarExtra', false);
             });
+
+            // Registrar acción extra
+            document.getElementById('btnRegistrarExtra').addEventListener('click', handleRegistrarExtra);
         });
+
+        // --------------------- ESTADO Y BOTONES PRINCIPALES ---------------------
 
         function consultarEstadoHorasExtra() {
             fetch('@Url.Action("EstadoHorasExtraHoy", "HorasExtra")')
@@ -114,7 +107,7 @@
                 .then(data => {
                     estadoHorasExtra = data.estado ?? "noIniciado";
                     almuerzoExtra = data.almuerzo ?? "noIniciado";
-                    jornadaHorasExtraId = data.jornadaId ?? null; // <-- IMPORTANTE!
+                    jornadaHorasExtraId = data.jornadaId ?? null;
                     actualizarBotonesHorasExtra();
                     let msg = "";
                     if (estadoHorasExtra === "noIniciado")
@@ -125,7 +118,6 @@
                         msg = `<div class="alert alert-success">Horas extra finalizadas hoy.</div>`;
                     document.getElementById("alertEstadoHorasExtra").innerHTML = msg;
                 });
-            cargarTimelineHorasExtra();
         }
 
         function actualizarBotonesHorasExtra() {
@@ -135,47 +127,59 @@
                 cont.innerHTML = `
                     <button class="btn btn-success btn-lg" id="btnInicioHorasExtra">
                         <i class="mdi mdi-play me-1"></i> Iniciar Horas Extra
+                        <span class="spinner-border spinner-border-sm ms-2" id="spinnerInicioHE" style="display:none"></span>
                     </button>
                 `;
                 document.getElementById("btnInicioHorasExtra").onclick = async function () {
-                    await registrarEventoHorasExtra("horas_extra_inicio");
+                    setBtnLoading('btnInicioHorasExtra', true);
+                    await registrarEventoHorasExtra("horas_extra_inicio", "", null, (ok) => {
+                        setBtnLoading('btnInicioHorasExtra', false);
+                        if(ok) consultarEstadoHorasExtra();
+                        cargarTimelineHorasExtra();
+                    });
                 };
             } else if (estadoHorasExtra === "enCurso") {
                 cont.innerHTML = `
                     <button class="btn btn-warning btn-lg" id="btnAlmuerzoHorasExtra">
                         <i class="mdi mdi-silverware-fork-knife me-1"></i> ${almuerzoExtra === "enCurso" ? "Fin de Almuerzo" : "Almuerzo Horas Extra"}
+                        <span class="spinner-border spinner-border-sm ms-2" id="spinnerAlmuerzoHE" style="display:none"></span>
                     </button>
                     <button class="btn btn-danger btn-lg" id="btnFinHorasExtra">
                         <i class="mdi mdi-stop me-1"></i> Finalizar Horas Extra
+                        <span class="spinner-border spinner-border-sm ms-2" id="spinnerFinHE" style="display:none"></span>
                     </button>
                     <button class="btn btn-secondary btn-lg" id="btnExtras" data-bs-toggle="modal" data-bs-target="#modalExtras">
                         <i class="mdi mdi-dots-horizontal me-1"></i> Acciones Extra
                     </button>
                 `;
+
                 // Botón almuerzo
                 document.getElementById("btnAlmuerzoHorasExtra").onclick = async function () {
-                    if (almuerzoExtra === "noIniciado") {
-                        await registrarEventoHorasExtra("almuerzo_inicio_horas_extra");
-                    } else if (almuerzoExtra === "enCurso") {
-                        await registrarEventoHorasExtra("almuerzo_fin_horas_extra");
-                    }
+                    setBtnLoading('btnAlmuerzoHorasExtra', true);
+                    let tipo = almuerzoExtra === "noIniciado" ? "almuerzo_inicio_horas_extra" : "almuerzo_fin_horas_extra";
+                    await registrarEventoHorasExtra(tipo, "", null, (ok) => {
+                        setBtnLoading('btnAlmuerzoHorasExtra', false);
+                        if(ok) consultarEstadoHorasExtra();
+                        cargarTimelineHorasExtra();
+                    });
                 };
                 // Botón fin de horas extra
-                            document.getElementById("btnFinHorasExtra").onclick = async function () {
+
+                        document.getElementById("btnFinHorasExtra").onclick = async function () {
+            setBtnLoading('btnFinHorasExtra', true);
             await registrarEventoHorasExtra("horas_extra_fin", "", null, async function (ok) {
-                console.log("Jornada extra ID antes de cerrar:", jornadaHorasExtraId);
                 if (ok && jornadaHorasExtraId) {
                     try {
-                        const res = await fetch('@Url.Action("CerrarJornadaExtra", "Jornada")', {
+                        const res = await fetch('@Url.Action("CerrarJornada", "Jornada")', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ jornadaId: jornadaHorasExtraId })
+                            body: JSON.stringify(jornadaHorasExtraId)  // <-- CAMBIA aquí!
                         });
                         const result = await res.json();
-
                         if (res.ok && result.success) {
                             showToast("¡Horas extra finalizadas y cerradas! 🏁", "primary");
                             consultarEstadoHorasExtra();
+                            cargarTimelineHorasExtra();
                         } else {
                             showToast(result.mensaje || "Error al cerrar las horas extra.", "danger");
                         }
@@ -185,37 +189,48 @@
                 } else {
                     showToast("No hay jornada extra activa o ID no encontrado.", "danger");
                 }
+                setBtnLoading('btnFinHorasExtra', false);
             });
         };
 
+
+
             }
-            // Si finalizado, no muestra botones (sólo mensaje)
+            // Si finalizado, no muestra botones
         }
 
-        async function registrarEventoHorasExtra(tipoEvento, obs = "", datosManual = null, callback) {
-            const datos = datosManual || await obtenerDatosUbicacion();
-            const response = await fetch('@Url.Action("RegistrarEventoHorasExtra", "HorasExtra")', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    tipoEvento: tipoEvento,
-                    observaciones: obs,
-                    ip: datos.ip,
-                    latitud: datos.lat,
-                    longitud: datos.lng
-                })
-            });
-            const result = await response.json();
-            if (response.ok && result.success) {
-                showToast(result.mensaje || '¡Evento registrado!', 'success');
-                consultarEstadoHorasExtra();
-                cargarTimelineHorasExtra();
-                if (typeof callback === "function") callback(true);
-            } else {
-                showToast(result.mensaje || 'No se pudo registrar el evento.');
-                if (typeof callback === "function") callback(false);
+        // --------------------- MODAL ACCIÓN EXTRA ---------------------
+
+        async function handleRegistrarExtra() {
+            const btn = document.getElementById('btnRegistrarExtra');
+            btn.disabled = true;
+            setBtnLoading('btnRegistrarExtra', true);
+
+            const tipo = document.getElementById('extraTipoEvento').value;
+            const obs = document.getElementById('extraObservaciones').value.trim();
+
+            // Validación: observación requerida si es "otro" o "permiso"
+            if ((tipo === "otro" || tipo === "permiso") && !obs) {
+                showToast("Por favor, agrega una observación para la acción seleccionada.", "warning");
+                btn.disabled = false;
+                setBtnLoading('btnRegistrarExtra', false);
+                return;
             }
+            const datos = await obtenerDatosUbicacion();
+            await registrarEventoHorasExtra(tipo, obs, datos, function (ok) {
+                if (ok) {
+                    showToast("¡Acción extra registrada!", "info");
+                    consultarEstadoHorasExtra();
+                    cargarTimelineHorasExtra();
+                    var modal = bootstrap.Modal.getInstance(document.getElementById('modalExtras'));
+                    modal.hide();
+                }
+                btn.disabled = false;
+                setBtnLoading('btnRegistrarExtra', false);
+            });
         }
+
+        // --------------------- TIMELINE HORAS EXTRA ---------------------
 
         function cargarTimelineHorasExtra() {
             const cont = document.getElementById("timelineHorasExtra");
@@ -247,7 +262,30 @@
                 });
         }
 
-        // Helper: IP + geolocalización
+        // --------------------- HELPERS ---------------------
+
+        async function registrarEventoHorasExtra(tipoEvento, obs = "", datosManual = null, callback) {
+            const datos = datosManual || await obtenerDatosUbicacion();
+            const response = await fetch('@Url.Action("RegistrarEventoHorasExtra", "HorasExtra")', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    tipoEvento: tipoEvento,
+                    observaciones: obs,
+                    ip: datos.ip,
+                    latitud: datos.lat,
+                    longitud: datos.lng
+                })
+            });
+            const result = await response.json();
+            if (response.ok && result.success) {
+                if (typeof callback === "function") callback(true);
+            } else {
+                showToast(result.mensaje || 'No se pudo registrar el evento.');
+                if (typeof callback === "function") callback(false);
+            }
+        }
+
         async function obtenerDatosUbicacion() {
             let ip = "";
             try {
@@ -268,7 +306,20 @@
             return { ip, lat: ubic.lat, lng: ubic.lng };
         }
 
-        // Toast helper
+        function setBtnLoading(btnId, isLoading) {
+            const btn = document.getElementById(btnId);
+            if (!btn) return;
+            let spinner = btn.querySelector('.spinner-border');
+            if (!spinner) return;
+            if (isLoading) {
+                btn.disabled = true;
+                spinner.style.display = "inline-block";
+            } else {
+                btn.disabled = false;
+                spinner.style.display = "none";
+            }
+        }
+
         function showToast(message, type = 'danger') {
             const colorClass = {
                 success: 'text-bg-success',
@@ -277,7 +328,6 @@
                 primary: 'text-bg-primary',
                 danger: 'text-bg-danger'
             }[type] || 'text-bg-danger';
-
             const toastId = 'toast-' + Date.now();
             const toastHtml = `
                 <div id="${toastId}" class="toast align-items-center ${colorClass} border-0 show" role="alert" aria-live="assertive" aria-atomic="true">

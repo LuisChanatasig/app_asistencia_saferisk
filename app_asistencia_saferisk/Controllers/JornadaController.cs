@@ -60,11 +60,10 @@ namespace app_asistencia_saferisk.Controllers
             return Json(timeline);
         }
 
-        // Si necesitas la vista para el detalle de la jornada, puedes agregarla aquí:
+        // Si se necesita la vista para el detalle de la jornada, se puede agregar aquí:
         [HttpGet]
         public IActionResult DetalleHoy()
         {
-            // Lógica para cargar el detalle de la jornada (puedes usar servicios, models, etc)
             return View();
         }
 
@@ -80,7 +79,7 @@ namespace app_asistencia_saferisk.Controllers
             // Obtener el estado y jornada_id
             var estado = await _jornadaService.ObtenerEstadoJornadaHoyAsync(usuarioId.Value);
 
-            int? jornadaId = (int?)(estado?.GetType().GetProperty("jornadaId")?.GetValue(estado) ?? null);
+            int? jornadaId = estado?.JornadaId;
 
             if (jornadaId == null)
                 return Json(new { success = false, mensaje = "No tienes una jornada abierta hoy." });

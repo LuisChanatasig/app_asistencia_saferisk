@@ -249,10 +249,21 @@ namespace app_asistencia_saferisk.Servicios
                         "salida" => "mdi-logout-variant text-danger",
                         "almuerzo_inicio" => "mdi-silverware-fork-knife text-warning",
                         "almuerzo_fin" => "mdi-food text-success",
+                        "break_inicio" => "mdi-coffee-outline text-info",
+                        "break_fin" => "mdi-coffee text-success",
                         "remoto" => "mdi-home-city-outline text-info",
                         "oficina" => "mdi-office-building-marker-outline text-primary",
+                        "permiso" => "mdi-account-cancel text-warning",
+                        "permiso_fin" => "mdi-account-check text-success",
+                        "reunion" => "mdi-account-group text-secondary",
+                        "soporte técnico visita" => "mdi-laptop-wrench text-secondary",
+                        "otro" => "mdi-dots-horizontal text-dark",
+                        "traslado_inicio" => "mdi-car-arrow-right text-info",
+                        "traslado_fin" => "mdi-flag-checkered text-success",
+                        // Puedes seguir agregando más según tu tabla tipo_evento
                         _ => "mdi-checkbox-blank-circle-outline text-secondary"
                     };
+
 
                     string horaStr = "";
                     if (reader["hora_registro"] != DBNull.Value)
@@ -266,6 +277,8 @@ namespace app_asistencia_saferisk.Servicios
 
                     timeline.Add(new
                     {
+                        codigo = reader["tipo_evento"].ToString(),  // <-- IMPORTANTE para los botones!
+
                         descripcion = reader["descripcion"].ToString(),
                         icono,
                         hora = horaStr,
