@@ -45,20 +45,29 @@ namespace app_asistencia_saferisk.Controllers
             return Json(result);
         }
 
-        
+
 
 
         // 3. Timeline del día (AJAX GET)
         [HttpGet]
         public async Task<IActionResult> TimelineHoy()
         {
-            var usuarioId = HttpContext.Session.GetInt32("UsuarioId");
-            if (usuarioId == null)
-                return Json(new List<object>());
+            try
+            {
+                var usuarioId = HttpContext.Session.GetInt32("UsuarioId");
+                if (usuarioId == null)
+                    return Json(new List<object>());
 
-            var timeline = await _jornadaService.ObtenerTimelineHoyAsync(usuarioId.Value);
-            return Json(timeline);
+                var timeline = await _jornadaService.ObtenerTimelineHoyAsync(usuarioId.Value);
+                return Json(timeline);
+            }
+            catch (Exception ex)
+            {
+                Response.StatusCode = 500;
+                return Json(new { success = false, error = ex.Message });
+            }
         }
+
 
         // Si se necesita la vista para el detalle de la jornada, se puede agregar aquí:
         [HttpGet]

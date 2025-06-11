@@ -4,7 +4,7 @@
     @await Html.PartialAsync("~/Views/Shared/_title_meta.cshtml")
     @RenderSection("styles", required: false)
     @await Html.PartialAsync("~/Views/Shared/_head_css.cshtml")
-    <link rel="manifest" href="/manifest.json">
+    <link rel="manifest" href="/app_asistencia_saf/manifest.json">
     <meta name="theme-color" content="#2162d5">
 
 </head>
@@ -37,7 +37,7 @@
     <script>
                 if ('serviceWorker' in navigator) {
             window.addEventListener('load', function () {
-                navigator.serviceWorker.register('/service-worker.js')
+                navigator.serviceWorker.register('/app_asistencia_saf/service-worker.js')
                     .then(function (registration) {
                         console.log('Service Worker registrado con éxito:', registration.scope);
                     })

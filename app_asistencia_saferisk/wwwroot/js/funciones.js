@@ -320,7 +320,10 @@ function cargarYActualizarTimeline() {
     </div>`;
 
         fetch(window.appRoutes.timelineHoy)
-            .then(res => res.json())
+            .then(res => {
+                if (!res.ok) throw new Error("HTTP " + res.status);
+                return res.json();
+            })
             .then(eventos => {
                 timelineCont.innerHTML = "";
                 jornadaFinalizada = false;
@@ -341,16 +344,53 @@ function cargarYActualizarTimeline() {
                 let ultimoCambioJornada = null;
 
                 eventos.forEach(ev => {
-                    timelineCont.innerHTML += `
-                                <div class="d-flex align-items-center mb-2">
-                                    <span class="me-2">
-                                        <i class="mdi ${ev.icono} fs-4"></i>
-                                    </span>
-                                    <span class="fw-medium">${ev.descripcion}</span>
-                                    <span class="ms-auto text-muted small">${ev.hora}</span>
-                                    ${ev.obs ? `<span class="ms-2 small text-muted">(${ev.obs})</span>` : ""}
-                                </div>`;
+                    // ---------- MAPA ----------
+                    let mapHtml = '';
+                    if (ev.latitud && ev.longitud) {
+                        const mapId = 'map-' + Math.random().toString(36).substr(2, 9);
+                        mapHtml = `
+                            <button class="btn btn-sm btn-outline-primary py-0 px-2 mb-1" onclick="document.getElementById('${mapId}').style.display='block'; this.style.display='none';">
+                                <i class="mdi mdi-map-marker-outline"></i> Ver mapa
+                            </button>
+                            <div id="${mapId}" style="display:none;">
+                                <iframe
+                                    width="180"
+                                    height="120"
+                                    class="rounded-3 shadow-sm"
+                                    style="border:0; margin-top:2px;"
+                                    loading="lazy"
+                                    allowfullscreen
+                                    src="https://maps.google.com/maps?q=${ev.latitud},${ev.longitud}&z=16&output=embed">
+                                </iframe>
+                                <br>
+                                <button class="btn btn-sm btn-outline-secondary py-0 px-2 mt-1" onclick="this.parentElement.style.display='none'; this.parentElement.previousElementSibling.style.display='inline-block';">
+                                    <i class="mdi mdi-close"></i> Cerrar mapa
+                                </button>
+                            </div>
+                        `;
+                    }
 
+                    // ---------- RENDER TIMELINE ----------
+                    timelineCont.innerHTML += `
+                        <div class="mb-3">
+                            <div class="d-flex align-items-center">
+                                <span class="me-2">
+                                    <i class="mdi ${ev.icono} fs-4"></i>
+                                </span>
+                                <span class="fw-medium">${ev.descripcion}</span>
+                                <span class="ms-auto text-muted small">${ev.hora}</span>
+                                ${ev.obs ? `<span class="ms-2 small text-muted">(${ev.obs})</span>` : ""}
+                            </div>
+                            <div class="ms-5 small text-muted">
+                                IP: ${ev.ip || 'N/D'}
+                                ${ev.latitud && ev.longitud ? `<span class="mx-2">| Coordenadas: ${Number(ev.latitud).toFixed(5)}, ${Number(ev.longitud).toFixed(5)}</span>` : ""}
+                                <br>
+                                ${mapHtml}
+                            </div>
+                        </div>
+                    `;
+
+                    // ------ TU LÓGICA DE ESTADOS ------
                     // Revisa eventos traslado/cambio de modalidad
                     if (ev.codigo === "traslado_inicio" || ev.codigo === "traslado_fin") {
                         ultimoTraslado = ev;
@@ -395,6 +435,11 @@ function cargarYActualizarTimeline() {
                     bloquearBotonesJornada();
                 }
 
+                resolve();
+            }).catch(err => {
+                // Aquí caes si hubo error en el fetch o al parsear
+                timelineCont.innerHTML = `<div class="text-danger text-center">Error al cargar el timeline.<br>${err}</div>`;
+                console.error("Error en timelineHoy:", err);
                 resolve();
             });
     });
@@ -613,14 +658,22 @@ async function obtenerDatosUbicacion() {
             if (!navigator.geolocation) return resolve({ lat: null, lng: null });
             navigator.geolocation.getCurrentPosition(
                 pos => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-                () => resolve({ lat: null, lng: null }),
+                error => {
+                    alert("No se pudo obtener la ubicación. Por favor, revisa los permisos del navegador.\n\nSe usará una ubicación de ejemplo.");
+                    // Coordenadas de ejemplo: Guayaquil
+                    resolve({ lat: -2.170998, lng: -79.922359 });
+                },
                 { enableHighAccuracy: true, timeout: 5000 }
             );
         });
     }
+
     const ubic = await obtenerUbicacion();
+    console.log("Datos de ubicación obtenidos:", { ip, lat: ubic.lat, lng: ubic.lng });
+
     return { ip, lat: ubic.lat, lng: ubic.lng };
 }
+
 
 async function registrarEvento(tipoEvento, observaciones, datos, callback) {
 

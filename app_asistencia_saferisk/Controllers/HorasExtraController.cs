@@ -18,6 +18,8 @@ namespace app_asistencia_saferisk.Controllers
             
             return View();
         }
+
+
         // 1.1 Estado horas extra
         [HttpGet]
         public async Task<IActionResult> EstadoHorasExtraHoy()

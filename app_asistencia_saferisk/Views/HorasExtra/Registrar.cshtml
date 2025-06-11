@@ -134,14 +134,21 @@
                     setBtnLoading('btnInicioHorasExtra', true);
                     await registrarEventoHorasExtra("horas_extra_inicio", "", null, (ok) => {
                         setBtnLoading('btnInicioHorasExtra', false);
-                        if(ok) consultarEstadoHorasExtra();
+                        if (ok) consultarEstadoHorasExtra();
                         cargarTimelineHorasExtra();
                     });
                 };
             } else if (estadoHorasExtra === "enCurso") {
+                const almuerzoFinalizado = almuerzoExtra === "finalizado";
+                const almuerzoBtnClass = almuerzoFinalizado ? "btn-secondary" : "btn-warning";
+                const almuerzoBtnText = almuerzoFinalizado
+                    ? "Almuerzo Finalizado"
+                    : (almuerzoExtra === "enCurso" ? "Fin de Almuerzo" : "Almuerzo Horas Extra");
+
                 cont.innerHTML = `
-                    <button class="btn btn-warning btn-lg" id="btnAlmuerzoHorasExtra">
-                        <i class="mdi mdi-silverware-fork-knife me-1"></i> ${almuerzoExtra === "enCurso" ? "Fin de Almuerzo" : "Almuerzo Horas Extra"}
+                    <button class="btn ${almuerzoBtnClass} btn-lg" id="btnAlmuerzoHorasExtra" ${almuerzoFinalizado ? "disabled" : ""}>
+                        <i class="mdi mdi-silverware-fork-knife me-1"></i>
+                        ${almuerzoBtnText}
                         <span class="spinner-border spinner-border-sm ms-2" id="spinnerAlmuerzoHE" style="display:none"></span>
                     </button>
                     <button class="btn btn-danger btn-lg" id="btnFinHorasExtra">
@@ -153,48 +160,48 @@
                     </button>
                 `;
 
-                // Botón almuerzo
-                document.getElementById("btnAlmuerzoHorasExtra").onclick = async function () {
-                    setBtnLoading('btnAlmuerzoHorasExtra', true);
-                    let tipo = almuerzoExtra === "noIniciado" ? "almuerzo_inicio_horas_extra" : "almuerzo_fin_horas_extra";
-                    await registrarEventoHorasExtra(tipo, "", null, (ok) => {
-                        setBtnLoading('btnAlmuerzoHorasExtra', false);
-                        if(ok) consultarEstadoHorasExtra();
-                        cargarTimelineHorasExtra();
+                // Sólo asigna el evento si no está finalizado el almuerzo
+                if (!almuerzoFinalizado) {
+                    document.getElementById("btnAlmuerzoHorasExtra").onclick = async function () {
+                        setBtnLoading('btnAlmuerzoHorasExtra', true);
+                        let tipo = almuerzoExtra === "noIniciado" ? "almuerzo_inicio_horas_extra" : "almuerzo_fin_horas_extra";
+                        await registrarEventoHorasExtra(tipo, "", null, (ok) => {
+                            setBtnLoading('btnAlmuerzoHorasExtra', false);
+                            if (ok) consultarEstadoHorasExtra();
+                            cargarTimelineHorasExtra();
+                        });
+                    };
+                }
+
+                // Botón fin de horas extra (queda igual)
+                document.getElementById("btnFinHorasExtra").onclick = async function () {
+                    setBtnLoading('btnFinHorasExtra', true);
+                    await registrarEventoHorasExtra("horas_extra_fin", "", null, async function (ok) {
+                        if (ok && jornadaHorasExtraId) {
+                            try {
+                                const res = await fetch('@Url.Action("CerrarJornada", "Jornada")', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify(jornadaHorasExtraId)
+                                });
+                                const result = await res.json();
+                                if (res.ok && result.success) {
+                                    showToast("¡Horas extra finalizadas y cerradas! 🏁", "primary");
+                                    consultarEstadoHorasExtra();
+                                    cargarTimelineHorasExtra();
+                                } else {
+                                    showToast(result.mensaje || "Error al cerrar las horas extra.", "danger");
+                                }
+                            } catch (e) {
+                                showToast("No se pudo cerrar las horas extra.", "danger");
+                            }
+                        } else {
+                            showToast("No hay jornada extra activa o ID no encontrado.", "danger");
+                        }
+                        setBtnLoading('btnFinHorasExtra', false);
                     });
                 };
-                // Botón fin de horas extra
-
-                        document.getElementById("btnFinHorasExtra").onclick = async function () {
-            setBtnLoading('btnFinHorasExtra', true);
-            await registrarEventoHorasExtra("horas_extra_fin", "", null, async function (ok) {
-                if (ok && jornadaHorasExtraId) {
-                    try {
-                        const res = await fetch('@Url.Action("CerrarJornada", "Jornada")', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(jornadaHorasExtraId)  // <-- CAMBIA aquí!
-                        });
-                        const result = await res.json();
-                        if (res.ok && result.success) {
-                            showToast("¡Horas extra finalizadas y cerradas! 🏁", "primary");
-                            consultarEstadoHorasExtra();
-                            cargarTimelineHorasExtra();
-                        } else {
-                            showToast(result.mensaje || "Error al cerrar las horas extra.", "danger");
-                        }
-                    } catch (e) {
-                        showToast("No se pudo cerrar las horas extra.", "danger");
-                    }
-                } else {
-                    showToast("No hay jornada extra activa o ID no encontrado.", "danger");
-                }
-                setBtnLoading('btnFinHorasExtra', false);
-            });
-        };
-
-
-
+                // Botón de acciones extra no necesita JS aquí, ya usa data-bs-toggle
             }
             // Si finalizado, no muestra botones
         }
@@ -248,17 +255,55 @@
                         cont.innerHTML = `<div class="text-center text-muted">Sin eventos registrados aún.</div>`;
                         return;
                     }
-                    eventos.forEach(ev => {
-                        cont.innerHTML += `
-                            <div class="d-flex align-items-center mb-2">
-                                <span class="me-2">
-                                    <i class="mdi ${ev.icono} fs-4"></i>
-                                </span>
-                                <span class="fw-medium">${ev.descripcion}</span>
-                                <span class="ms-auto text-muted small">${ev.hora}</span>
-                                ${ev.obs ? `<span class="ms-2 small text-muted">(${ev.obs})</span>` : ""}
-                            </div>`;
-                    });
+
+                            eventos.forEach(ev => {
+            let mapHtml = '';
+            if (ev.latitud && ev.longitud) {
+                const mapId = 'map-' + Math.random().toString(36).substr(2, 9);
+                mapHtml = `
+                    <button class="btn btn-sm btn-outline-primary py-0 px-2 mb-1" onclick="document.getElementById('${mapId}').style.display='block'; this.style.display='none';">
+                        <i class="mdi mdi-map-marker-outline"></i> Ver mapa
+                    </button>
+                    <div id="${mapId}" style="display:none;">
+                        <iframe
+                            width="180"
+                            height="120"
+                            class="rounded-3 shadow-sm"
+                            style="border:0; margin-top:2px;"
+                            loading="lazy"
+                            allowfullscreen
+                            src="https://maps.google.com/maps?q=${ev.latitud},${ev.longitud}&z=16&output=embed">
+                        </iframe>
+                        <br>
+                        <button class="btn btn-sm btn-outline-secondary py-0 px-2 mt-1" onclick="this.parentElement.style.display='none'; this.parentElement.previousElementSibling.style.display='inline-block';">
+                            <i class="mdi mdi-close"></i> Cerrar mapa
+                        </button>
+                    </div>
+                `;
+            }
+
+            cont.innerHTML += `
+                <div class="mb-3">
+                    <div class="d-flex align-items-center">
+                        <span class="me-2">
+                            <i class="mdi ${ev.icono} fs-4"></i>
+                        </span>
+                        <span class="fw-medium">${ev.descripcion}</span>
+                        <span class="ms-auto text-muted small">${ev.hora}</span>
+                        ${ev.obs ? `<span class="ms-2 small text-muted">(${ev.obs})</span>` : ""}
+                    </div>
+                    <div class="ms-5 small text-muted">
+                        IP: ${ev.ip || 'N/D'}
+                        ${ev.latitud && ev.longitud ? `<span class="mx-2">| Coordenadas: ${Number(ev.latitud).toFixed(5)}, ${Number(ev.longitud).toFixed(5)}</span>` : ""}
+                        <br>
+                        ${mapHtml}
+                    </div>
+                </div>
+            `;
+        });
+
+
+
                 });
         }
 

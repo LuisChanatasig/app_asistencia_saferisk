@@ -243,6 +243,10 @@ namespace app_asistencia_saferisk.Servicios
                 while (await reader.ReadAsync())
                 {
                     var codigo = reader["tipo_evento"].ToString();
+
+                    var ip = reader["ip_registro"].ToString();
+                    var longitud = reader["longitud"].ToString();
+                    var latitud = reader["latitud"].ToString();
                     var icono = codigo switch
                     {
                         "entrada" => "mdi-login-variant text-success",
@@ -277,13 +281,16 @@ namespace app_asistencia_saferisk.Servicios
 
                     timeline.Add(new
                     {
-                        codigo = reader["tipo_evento"].ToString(),  // <-- IMPORTANTE para los botones!
-
+                        codigo = reader["tipo_evento"].ToString(),
                         descripcion = reader["descripcion"].ToString(),
                         icono,
                         hora = horaStr,
-                        obs = reader["observaciones"]?.ToString() ?? ""
+                        obs = reader["observaciones"]?.ToString() ?? "",
+                        ip = reader["ip_registro"]?.ToString() ?? "",
+                        latitud = reader["latitud"] == DBNull.Value ? (double?)null : Convert.ToDouble(reader["latitud"]),
+                        longitud = reader["longitud"] == DBNull.Value ? (double?)null : Convert.ToDouble(reader["longitud"])
                     });
+
 
                 }
             }
