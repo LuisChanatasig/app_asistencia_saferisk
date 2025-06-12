@@ -46,32 +46,21 @@
     </div>
 </div>
 
-<!-- Modal para acciones extra -->
-<div class="modal fade" id="modalExtras" tabindex="-1" aria-labelledby="modalExtrasLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="modalExtrasLabel">Registrar acción extra</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
-            </div>
-            <div class="modal-body">
-                <div class="mb-3">
-                    <select class="form-select" id="extraTipoEvento">
-                        <option value="permiso">Permiso especial</option>
-                        <option value="reunion">Reunión</option>
-                        <option value="visita">Visita cliente</option>
-                        <option value="otro">Otro</option>
-                    </select>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Observaciones</label>
-                    <input type="text" class="form-control" id="extraObservaciones" placeholder="Detalle de la acción">
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-primary" id="btnRegistrarExtra">Registrar</button>
-            </div>
+<!-- Offcanvas para acciones extra -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="offcanvasExtras" aria-labelledby="offcanvasExtrasLabel">
+    <div class="offcanvas-header">
+        <h5 class="offcanvas-title" id="offcanvasExtrasLabel">Registrar acción extra</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Cerrar"></button>
+    </div>
+    <div class="offcanvas-body">
+        <div id="accionesExtraBtns" class="d-flex flex-wrap gap-2 mb-3"></div>
+        <div id="extraObsGroup" class="mb-3" style="display:none;">
+            <label class="form-label">Observaciones</label>
+            <input type="text" class="form-control" id="extraObservaciones" placeholder="Detalle de la acción">
+        </div>
+        <div class="d-flex justify-content-end gap-2">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="offcanvas">Cancelar</button>
+            <button type="button" class="btn btn-primary" id="btnRegistrarExtra" disabled>Registrar</button>
         </div>
     </div>
 </div>
@@ -79,50 +68,81 @@
 
 @section Scripts {
     <script>
+           // ==================== CONFIGURACIÓN ====================
+
+        // Opciones de acciones extra (puedes agregar más si tu backend lo soporta)
+        const opcionesExtra = [
+            { key: "permiso", label: "Permiso especial", icon: "mdi mdi-account-cancel text-warning", requiereObs: true, inicio: "permiso", fin: "permiso_fin" },
+            { key: "break", label: "Break Horas Extra", icon: "mdi mdi-coffee-outline text-info", requiereObs: false, inicio: "break_inicio", fin: "break_fin" },
+            { key: "traslado", label: "Traslado Horas Extra", icon: "mdi mdi-car-arrow-right text-secondary", requiereObs: false, inicio: "traslado_inicio", fin: "traslado_fin" },
+            // Puedes agregar más tipos aquí...
+        ];
+
         let estadoHorasExtra = "noIniciado";
         let almuerzoExtra = "noIniciado";
-
+        let enPermisoExtra = false;
+        let enBreakExtra = false;
+        let enTrasladoExtra = false;
+        let tipoExtraActivo = null; // "permiso", "break", "traslado" o null
         let jornadaHorasExtraId = null;
+        let extraTipoEventoSeleccionado = null;
+
+        // ==================== EVENTOS DE ARRANQUE ====================
+
         document.addEventListener("DOMContentLoaded", function () {
             consultarEstadoHorasExtra();
             cargarTimelineHorasExtra();
 
-            // Limpia modal cada vez que se abre
-            document.getElementById('modalExtras').addEventListener('show.bs.modal', () => {
-                document.getElementById('extraTipoEvento').selectedIndex = 0;
+            // Prepara offcanvas de acciones extra
+            document.getElementById('offcanvasExtras').addEventListener('show.bs.offcanvas', () => {
+                window._registrandoExtra = false;
+                extraTipoEventoSeleccionado = null;
                 document.getElementById('extraObservaciones').value = "";
-                document.getElementById('btnRegistrarExtra').disabled = false;
+                document.getElementById('extraObsGroup').style.display = "none";
+                document.getElementById('btnRegistrarExtra').disabled = true;
                 setBtnLoading('btnRegistrarExtra', false);
+                renderizarAccionesExtraBtns();
             });
 
-            // Registrar acción extra
             document.getElementById('btnRegistrarExtra').addEventListener('click', handleRegistrarExtra);
         });
 
-        // --------------------- ESTADO Y BOTONES PRINCIPALES ---------------------
-
-        function consultarEstadoHorasExtra() {
-            fetch('@Url.Action("EstadoHorasExtraHoy", "HorasExtra")')
-                .then(res => res.json())
-                .then(data => {
-                    estadoHorasExtra = data.estado ?? "noIniciado";
-                    almuerzoExtra = data.almuerzo ?? "noIniciado";
-                    jornadaHorasExtraId = data.jornadaId ?? null;
-                    actualizarBotonesHorasExtra();
-                    let msg = "";
-                    if (estadoHorasExtra === "noIniciado")
-                        msg = `<div class="alert alert-info">No has iniciado horas extra.</div>`;
-                    else if (estadoHorasExtra === "enCurso")
-                        msg = `<div class="alert alert-warning">Horas extra en curso.</div>`;
-                    else if (estadoHorasExtra === "finalizado")
-                        msg = `<div class="alert alert-success">Horas extra finalizadas hoy.</div>`;
-                    document.getElementById("alertEstadoHorasExtra").innerHTML = msg;
-                });
-        }
+        // ==================== BOTONES PRINCIPALES ====================
 
         function actualizarBotonesHorasExtra() {
             const cont = document.getElementById("accionesHorasExtra");
             cont.innerHTML = "";
+
+            // Si hay acción extra activa: muestra solo botón de finalizar esa acción
+            if (tipoExtraActivo) {
+                const opc = opcionesExtra.find(x => x.key === tipoExtraActivo);
+                let icon = (opc && opc.icon) || "mdi mdi-alert";
+                let label = "Finalizar " + (opc ? opc.label : tipoExtraActivo.charAt(0).toUpperCase() + tipoExtraActivo.slice(1));
+                let finEvento = (opc && opc.fin) || (tipoExtraActivo + "_fin");
+
+                cont.innerHTML = `
+                    <button class="btn btn-warning btn-lg" id="btnFinExtra">
+                        <i class="${icon} me-1"></i> ${label}
+                        <span class="spinner-border spinner-border-sm ms-2" id="spinnerFinExtra" style="display:none"></span>
+                    </button>
+                `;
+                document.getElementById("btnFinExtra").onclick = async function () {
+                    setBtnLoading('btnFinExtra', true);
+                    await registrarEventoHorasExtra(finEvento, "", null, (ok) => {
+                        setBtnLoading('btnFinExtra', false);
+                        if (ok) {
+                            consultarEstadoHorasExtra();
+                            cargarTimelineHorasExtra();
+                        }
+                    });
+                };
+                return; // solo muestra este botón mientras está activo el extra
+            }
+
+            // Si no hay acción extra activa: botones normales
+            let estadoMsg = "";
+            document.getElementById("alertEstadoHorasExtra").innerHTML = estadoMsg;
+
             if (estadoHorasExtra === "noIniciado") {
                 cont.innerHTML = `
                     <button class="btn btn-success btn-lg" id="btnInicioHorasExtra">
@@ -146,7 +166,8 @@
                     : (almuerzoExtra === "enCurso" ? "Fin de Almuerzo" : "Almuerzo Horas Extra");
 
                 cont.innerHTML = `
-                    <button class="btn ${almuerzoBtnClass} btn-lg" id="btnAlmuerzoHorasExtra" ${almuerzoFinalizado ? "disabled" : ""}>
+                    <button class="btn ${almuerzoBtnClass} btn-lg" id="btnAlmuerzoHorasExtra"
+                        ${almuerzoFinalizado ? 'disabled title="Almuerzo ya finalizado"' : ''}>
                         <i class="mdi mdi-silverware-fork-knife me-1"></i>
                         ${almuerzoBtnText}
                         <span class="spinner-border spinner-border-sm ms-2" id="spinnerAlmuerzoHE" style="display:none"></span>
@@ -155,12 +176,11 @@
                         <i class="mdi mdi-stop me-1"></i> Finalizar Horas Extra
                         <span class="spinner-border spinner-border-sm ms-2" id="spinnerFinHE" style="display:none"></span>
                     </button>
-                    <button class="btn btn-secondary btn-lg" id="btnExtras" data-bs-toggle="modal" data-bs-target="#modalExtras">
+                    <button class="btn btn-secondary btn-lg" id="btnExtras" data-bs-toggle="offcanvas" data-bs-target="#offcanvasExtras">
                         <i class="mdi mdi-dots-horizontal me-1"></i> Acciones Extra
                     </button>
                 `;
-
-                // Sólo asigna el evento si no está finalizado el almuerzo
+                // Almuerzo
                 if (!almuerzoFinalizado) {
                     document.getElementById("btnAlmuerzoHorasExtra").onclick = async function () {
                         setBtnLoading('btnAlmuerzoHorasExtra', true);
@@ -172,8 +192,7 @@
                         });
                     };
                 }
-
-                // Botón fin de horas extra (queda igual)
+                // Finalizar horas extra
                 document.getElementById("btnFinHorasExtra").onclick = async function () {
                     setBtnLoading('btnFinHorasExtra', true);
                     await registrarEventoHorasExtra("horas_extra_fin", "", null, async function (ok) {
@@ -201,43 +220,10 @@
                         setBtnLoading('btnFinHorasExtra', false);
                     });
                 };
-                // Botón de acciones extra no necesita JS aquí, ya usa data-bs-toggle
             }
-            // Si finalizado, no muestra botones
         }
 
-        // --------------------- MODAL ACCIÓN EXTRA ---------------------
-
-        async function handleRegistrarExtra() {
-            const btn = document.getElementById('btnRegistrarExtra');
-            btn.disabled = true;
-            setBtnLoading('btnRegistrarExtra', true);
-
-            const tipo = document.getElementById('extraTipoEvento').value;
-            const obs = document.getElementById('extraObservaciones').value.trim();
-
-            // Validación: observación requerida si es "otro" o "permiso"
-            if ((tipo === "otro" || tipo === "permiso") && !obs) {
-                showToast("Por favor, agrega una observación para la acción seleccionada.", "warning");
-                btn.disabled = false;
-                setBtnLoading('btnRegistrarExtra', false);
-                return;
-            }
-            const datos = await obtenerDatosUbicacion();
-            await registrarEventoHorasExtra(tipo, obs, datos, function (ok) {
-                if (ok) {
-                    showToast("¡Acción extra registrada!", "info");
-                    consultarEstadoHorasExtra();
-                    cargarTimelineHorasExtra();
-                    var modal = bootstrap.Modal.getInstance(document.getElementById('modalExtras'));
-                    modal.hide();
-                }
-                btn.disabled = false;
-                setBtnLoading('btnRegistrarExtra', false);
-            });
-        }
-
-        // --------------------- TIMELINE HORAS EXTRA ---------------------
+        // ==================== TIMELINE Y ESTADOS ====================
 
         function cargarTimelineHorasExtra() {
             const cont = document.getElementById("timelineHorasExtra");
@@ -251,63 +237,166 @@
                 .then(res => res.json())
                 .then(eventos => {
                     cont.innerHTML = "";
+                    enPermisoExtra = false; enBreakExtra = false; enTrasladoExtra = false;
+                    tipoExtraActivo = null;
+
                     if (!eventos || !eventos.length) {
                         cont.innerHTML = `<div class="text-center text-muted">Sin eventos registrados aún.</div>`;
+                        actualizarBotonesHorasExtra();
                         return;
                     }
 
-                            eventos.forEach(ev => {
-            let mapHtml = '';
-            if (ev.latitud && ev.longitud) {
-                const mapId = 'map-' + Math.random().toString(36).substr(2, 9);
-                mapHtml = `
-                    <button class="btn btn-sm btn-outline-primary py-0 px-2 mb-1" onclick="document.getElementById('${mapId}').style.display='block'; this.style.display='none';">
-                        <i class="mdi mdi-map-marker-outline"></i> Ver mapa
-                    </button>
-                    <div id="${mapId}" style="display:none;">
-                        <iframe
-                            width="180"
-                            height="120"
-                            class="rounded-3 shadow-sm"
-                            style="border:0; margin-top:2px;"
-                            loading="lazy"
-                            allowfullscreen
-                            src="https://maps.google.com/maps?q=${ev.latitud},${ev.longitud}&z=16&output=embed">
-                        </iframe>
-                        <br>
-                        <button class="btn btn-sm btn-outline-secondary py-0 px-2 mt-1" onclick="this.parentElement.style.display='none'; this.parentElement.previousElementSibling.style.display='inline-block';">
-                            <i class="mdi mdi-close"></i> Cerrar mapa
-                        </button>
-                    </div>
-                `;
-            }
+                    eventos.forEach(ev => {
+                        if (ev.codigo === "permiso") enPermisoExtra = true;
+                        if (ev.codigo === "permiso_fin") enPermisoExtra = false;
+                        if (ev.codigo === "break_inicio") enBreakExtra = true;
+                        if (ev.codigo === "break_fin") enBreakExtra = false;
+                        if (ev.codigo === "traslado_inicio") enTrasladoExtra = true;
+                        if (ev.codigo === "traslado_fin") enTrasladoExtra = false;
+                    });
+                    if (enPermisoExtra) tipoExtraActivo = "permiso";
+                    else if (enBreakExtra) tipoExtraActivo = "break";
+                    else if (enTrasladoExtra) tipoExtraActivo = "traslado";
+                    else tipoExtraActivo = null;
 
-            cont.innerHTML += `
-                <div class="mb-3">
-                    <div class="d-flex align-items-center">
-                        <span class="me-2">
-                            <i class="mdi ${ev.icono} fs-4"></i>
-                        </span>
-                        <span class="fw-medium">${ev.descripcion}</span>
-                        <span class="ms-auto text-muted small">${ev.hora}</span>
-                        ${ev.obs ? `<span class="ms-2 small text-muted">(${ev.obs})</span>` : ""}
-                    </div>
-                    <div class="ms-5 small text-muted">
-                        IP: ${ev.ip || 'N/D'}
-                        ${ev.latitud && ev.longitud ? `<span class="mx-2">| Coordenadas: ${Number(ev.latitud).toFixed(5)}, ${Number(ev.longitud).toFixed(5)}</span>` : ""}
-                        <br>
-                        ${mapHtml}
-                    </div>
-                </div>
-            `;
-        });
+                    // Renderiza timeline (se puede agregar el mapa, IP, etc. aquí)
+                    eventos.forEach(ev => {
+                        let mapHtml = '';
+                        if (ev.latitud && ev.longitud) {
+                            const mapId = 'map-' + Math.random().toString(36).substr(2, 9);
+                            mapHtml = `
+                                <button class="btn btn-sm btn-outline-primary py-0 px-2 mb-1" onclick="document.getElementById('${mapId}').style.display='block'; this.style.display='none';">
+                                    <i class="mdi mdi-map-marker-outline"></i> Ver mapa
+                                </button>
+                                <div id="${mapId}" style="display:none;">
+                                    <iframe
+                                        width="180"
+                                        height="120"
+                                        class="rounded-3 shadow-sm"
+                                        style="border:0; margin-top:2px;"
+                                        loading="lazy"
+                                        allowfullscreen
+                                        src="https://maps.google.com/maps?q=${ev.latitud},${ev.longitud}&z=16&output=embed">
+                                    </iframe>
+                                    <br>
+                                    <button class="btn btn-sm btn-outline-secondary py-0 px-2 mt-1" onclick="this.parentElement.style.display='none'; this.parentElement.previousElementSibling.style.display='inline-block';">
+                                        <i class="mdi mdi-close"></i> Cerrar mapa
+                                    </button>
+                                </div>
+                            `;
+                        }
 
+                        cont.innerHTML += `
+                            <div class="mb-3">
+                                <div class="d-flex align-items-center">
+                                    <span class="me-2">
+                                        <i class="mdi ${ev.icono} fs-4"></i>
+                                    </span>
+                                    <span class="fw-medium">${ev.descripcion}</span>
+                                    <span class="ms-auto text-muted small">${ev.hora}</span>
+                                    ${ev.obs ? `<span class="ms-2 small text-muted">(${ev.obs})</span>` : ""}
+                                </div>
+                                <div class="ms-5 small text-muted">
+                                    IP: ${ev.ip || 'N/D'}
+                                    ${ev.latitud && ev.longitud ? `<span class="mx-2">| Coordenadas: ${Number(ev.latitud).toFixed(5)}, ${Number(ev.longitud).toFixed(5)}</span>` : ""}
+                                    <br>
+                                    ${mapHtml}
+                                </div>
+                            </div>
+                        `;
+                    });
 
-
+                    actualizarBotonesHorasExtra();
                 });
         }
 
-        // --------------------- HELPERS ---------------------
+        // ==================== OFFCANVAS ACCIONES EXTRA ====================
+
+        function renderizarAccionesExtraBtns() {
+            const cont = document.getElementById("accionesExtraBtns");
+            cont.innerHTML = "";
+            // Solo acciones que tengan evento inicio (ignora las solo informativas)
+            opcionesExtra.forEach(opc => {
+                if (!opc.inicio) return;
+                cont.innerHTML += `
+                    <button type="button" class="btn btn-outline-primary d-flex align-items-center gap-2 px-3 py-2${extraTipoEventoSeleccionado === opc.key ? ' active' : ''}"
+                        data-key="${opc.key}" ${window._registrandoExtra ? 'disabled' : ''}>
+                        <i class="${opc.icon} fs-5"></i> <span>${opc.label}</span>
+                    </button>
+                `;
+            });
+            cont.querySelectorAll('button').forEach(btn => {
+                btn.onclick = function () {
+                    if (window._registrandoExtra) return;
+                    extraTipoEventoSeleccionado = this.getAttribute('data-key');
+                    cont.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    const opc = opcionesExtra.find(x => x.key === extraTipoEventoSeleccionado);
+                    document.getElementById("extraObsGroup").style.display = (opc && opc.requiereObs) ? "block" : "none";
+                    document.getElementById('btnRegistrarExtra').disabled = false;
+                };
+            });
+        }
+
+        async function handleRegistrarExtra() {
+            const btn = document.getElementById('btnRegistrarExtra');
+            btn.disabled = true;
+            setBtnLoading('btnRegistrarExtra', true);
+            window._registrandoExtra = true;
+            renderizarAccionesExtraBtns();
+
+            const tipo = extraTipoEventoSeleccionado;
+            const opc = opcionesExtra.find(x => x.key === tipo);
+            const obs = document.getElementById('extraObservaciones').value.trim();
+
+            if (!tipo) {
+                showToast("Selecciona una acción.", "warning");
+                window._registrandoExtra = false;
+                setBtnLoading('btnRegistrarExtra', false);
+                renderizarAccionesExtraBtns();
+                btn.disabled = true;
+                return;
+            }
+            if (opc && opc.requiereObs && !obs) {
+                showToast("Por favor, agrega una observación para la acción seleccionada.", "warning");
+                window._registrandoExtra = false;
+                setBtnLoading('btnRegistrarExtra', false);
+                renderizarAccionesExtraBtns();
+                btn.disabled = false;
+                return;
+            }
+            const datos = await obtenerDatosUbicacion();
+            await registrarEventoHorasExtra(opc.inicio, obs, datos, function (ok) {
+                window._registrandoExtra = false;
+                setBtnLoading('btnRegistrarExtra', false);
+                if (ok) {
+                    showToast("¡Acción extra registrada!", "info");
+                    extraTipoEventoSeleccionado = null;
+                    consultarEstadoHorasExtra();
+                    cargarTimelineHorasExtra();
+                    var offcanvas = bootstrap.Offcanvas.getInstance(document.getElementById('offcanvasExtras'));
+                    if (offcanvas) offcanvas.hide();
+                }
+                renderizarAccionesExtraBtns();
+                btn.disabled = true;
+                document.getElementById('extraObservaciones').value = "";
+                document.getElementById('extraObsGroup').style.display = "none";
+            });
+        }
+
+
+                function consultarEstadoHorasExtra() {
+            fetch('@Url.Action("EstadoHorasExtraHoy", "HorasExtra")')
+                .then(res => res.json())
+                .then(data => {
+                    estadoHorasExtra = data.estado ?? "noIniciado";
+                    almuerzoExtra = data.almuerzo ?? "noIniciado";
+                    jornadaHorasExtraId = data.jornadaId ?? null;
+                    actualizarBotonesHorasExtra();
+                    
+                });
+        }
+        // ==================== HELPERS ====================
 
         async function registrarEventoHorasExtra(tipoEvento, obs = "", datosManual = null, callback) {
             const datos = datosManual || await obtenerDatosUbicacion();
@@ -387,7 +476,11 @@
             const toastEl = document.getElementById(toastId);
             new bootstrap.Toast(toastEl, { delay: 4000 }).show();
         }
+
+        // ==================== FIN ====================
+
     </script>
 }
+
 
 

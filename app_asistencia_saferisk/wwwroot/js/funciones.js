@@ -390,7 +390,7 @@ function cargarYActualizarTimeline() {
                         </div>
                     `;
 
-                    // ------ TU LÓGICA DE ESTADOS ------
+                    // ------ LÓGICA DE ESTADOS ------
                     // Revisa eventos traslado/cambio de modalidad
                     if (ev.codigo === "traslado_inicio" || ev.codigo === "traslado_fin") {
                         ultimoTraslado = ev;
@@ -559,7 +559,6 @@ function actualizarBotonBreak() {
 }
 
 // ---- Acciones extra dinámicas ----
-// --- renderAccionesExtra adaptado para "permiso" y "permiso_fin"
 function renderAccionesExtra() {
     const cont = document.getElementById('accionesExtraBtns');
     cont.innerHTML = "";
