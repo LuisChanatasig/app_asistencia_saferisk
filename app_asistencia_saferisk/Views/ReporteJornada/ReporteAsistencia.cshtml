@@ -1,0 +1,240 @@
+﻿@model List<ReporteJornadaDto>
+
+@{
+    ViewData["Title"] = "Reporte de Jornadas";
+}
+
+
+<!-- DataTables Bootstrap 5 CSS -->
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css" />
+<link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css" />
+<link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.1/css/buttons.bootstrap5.min.css" />
+
+<div class="container-xxl mt-4">
+    <div class="card shadow border-0">
+        <div class="card-header bg-primary-subtle d-flex justify-content-between align-items-center py-3 sticky-top" style="z-index:9">
+            <h4 class="mb-0 text-primary">
+                <i class="mdi mdi-clipboard-text-outline align-middle me-2"></i> Reporte de Jornadas
+            </h4>
+            <span class="badge bg-info-subtle text-info fs-6">
+                Total: <b>@Model?.Count</b>
+            </span>
+        </div>
+        <div class="card-body pb-2">
+            <form method="get" class="row row-cols-lg-auto g-3 align-items-center mb-4">
+                <div class="col-12">
+                    <label for="fechaInicio" class="form-label mb-1 text-muted">Desde</label>
+                    <input type="date" name="fechaInicio" id="fechaInicio" class="form-control form-control-sm" required />
+                </div>
+                <div class="col-12">
+                    <label for="fechaFin" class="form-label mb-1 text-muted">Hasta</label>
+                    <input type="date" name="fechaFin" id="fechaFin" class="form-control form-control-sm" required />
+                </div>
+                <div class="col-12">
+                    <button class="btn btn-primary btn-sm px-3" type="submit">
+                        <i class="mdi mdi-magnify"></i> Filtrar
+                    </button>
+                </div>
+            </form>
+
+
+            <div class="table-responsive">
+                <table id="alternative-pagination" class="table nowrap dt-responsive align-middle table-hover table-bordered w-100" style="width:100%">
+                    <thead class="table-light border-top">
+                        <tr>
+                            <th>Usuario</th>
+                            <th>Fecha</th>
+                            <th>Jornada</th>
+                            <th>Entrada</th>
+                            <th>Salida</th>
+                            <th>Puntualidad</th>
+                            <th>Horas Netas</th>
+                            <th>% Cumplimiento</th>
+                            <th>Semáforo</th>
+                            <th>Estado</th>
+                            <th>IP</th>
+                            <th>GPS</th>
+                            <th>Evento Actual</th>
+                            <th>Observaciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model == null || !Model.Any())
+                        {
+                            <tr>
+                                <td colspan="14" class="text-muted py-4">
+                                    <i class="mdi mdi-information-outline me-1"></i>
+                                    No existen jornadas en el rango seleccionado.
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            foreach (var r in Model)
+                            {
+                                var semaforoColor =
+                                r.Semaforo == "Verde" ? "success" :
+                                r.Semaforo == "Amarillo" ? "warning" : "danger";
+                                var punctualColor = r.Puntualidad == "SI" ? "success" : "danger";
+                                var ipColor = r.ValidaIpOficina == "SI" ? "success" : "danger";
+                                var gpsColor = r.ValidaGpsOficina == "SI" ? "success" : "danger";
+                                string eventoActual = "";
+                                if (!string.IsNullOrEmpty(r.EventosDelDia))
+                                {
+                                    var eventosArray = r.EventosDelDia.Split(';');
+                                    eventoActual = eventosArray.LastOrDefault()?.Trim();
+                                }
+                                <tr>
+                                    <td class="fw-semibold">@r.NombreUsuario</td>
+                                    <td>
+                                        <span class="badge bg-secondary-subtle text-dark">@r.Fecha.ToString("dd/MM/yyyy")</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-primary-subtle text-primary">@r.TipoJornada</span>
+                                    </td>
+                                    <td>
+                                        <i class="mdi mdi-login-variant text-success me-1"></i>
+                                        @r.HoraEntrada?.ToString(@"hh\:mm")
+                                    </td>
+                                    <td>
+                                        <i class="mdi mdi-logout-variant text-danger me-1"></i>
+                                        @r.HoraSalida?.ToString(@"hh\:mm")
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-@punctualColor">
+                                            <i class="mdi mdi-check-bold"></i>
+                                            @(r.Puntualidad == "SI" ? "Sí" : "No")
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="fw-bold">@r.HorasNetas?.ToString("0.##")</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-info-subtle text-info">
+                                            @r.PorcentajeCumplimiento?.ToString("0.##") %
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-@semaforoColor fs-6 py-2 px-3">
+                                            <i class="mdi mdi-traffic-light me-1"></i>
+                                            @r.Semaforo
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-light text-dark">@r.EstadoJornada</span>
+                                    </td>
+                                    <td>
+                                        <span class="d-block">@r.IpEntrada</span>
+                                        <span class="badge bg-@ipColor">
+                                            <i class="mdi mdi-lan-connect"></i> @r.ValidaIpOficina
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="d-block">@r.LatEntrada, @r.LonEntrada</span>
+                                        <span class="badge bg-@gpsColor">
+                                            <i class="mdi mdi-map-marker-check"></i> @r.ValidaGpsOficina
+                                        </span>
+                                    </td>
+                                    <td>
+                                        @if (!string.IsNullOrEmpty(eventoActual))
+                                        {
+                                            <span class="text-primary fw-semibold">@eventoActual</span>
+                                        }
+                                        <button type="button"
+                                                class="btn btn-link btn-sm p-0 ms-2"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#modalEventos"
+                                                onclick="mostrarDetalleEventos(`@r.EventosDelDia?.Replace("`", "'")`, `@r.NombreUsuario`, `@r.Fecha.ToString("yyyy-MM-dd")`)"
+                                                title="Ver historial completo">
+                                            <i class="mdi mdi-eye-outline fs-5"></i>
+                                        </button>
+                                    </td>
+                                    <td>
+                                        @if (!string.IsNullOrEmpty(r.Observaciones))
+                                        {
+                                            <span class="badge bg-warning-subtle text-warning">
+                                                <i class="mdi mdi-alert"></i> @r.Observaciones
+                                            </span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL para eventos del día -->
+<div class="modal fade" id="modalEventos" tabindex="-1" aria-labelledby="modalEventosLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-primary-subtle">
+                <h5 class="modal-title" id="modalEventosLabel">
+                    <i class="mdi mdi-calendar-clock text-primary"></i>
+                    Detalle de Eventos del Día
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body" id="modalEventosBody" style="white-space:pre-line;">
+                <!-- Aquí se muestra el detalle -->
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <!-- JQuery y DataTables JS (ajusta si Velzon ya lo tiene, evita doble carga) -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+    <script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
+    <script src="https://cdn.datatables.net/buttons/2.4.1/js/dataTables.buttons.min.js"></script>
+    <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.bootstrap5.min.js"></script>
+    <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.html5.min.js"></script>
+    <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.print.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js"></script>
+
+    <script>
+        $(document).ready(function () {
+            $('#alternative-pagination').DataTable({
+                language: {
+                    url: "//cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json"
+                },
+                pageLength: 10,
+                responsive: true,
+                order: [[1, 'desc']],
+                dom: 'Bfrtip',
+                buttons: [
+                    { extend: 'copy', className: 'btn btn-secondary btn-sm' },
+                    { extend: 'csv', className: 'btn btn-success btn-sm' },
+                    { extend: 'excel', className: 'btn btn-info btn-sm' },
+                    { extend: 'pdf', className: 'btn btn-danger btn-sm' },
+                    { extend: 'print', className: 'btn btn-primary btn-sm' }
+                ]
+            });
+        });
+
+        function mostrarDetalleEventos(eventos, usuario, fecha) {
+            var body = document.getElementById("modalEventosBody");
+            var title = document.getElementById("modalEventosLabel");
+            title.innerHTML = '<i class="mdi mdi-calendar-clock text-primary"></i> Eventos del Día - ' + usuario + ' (' + fecha + ')';
+
+            if (eventos) {
+                var eventosList = eventos.split(";").map(e => e.trim()).filter(e => e.length > 0);
+                var html = '<ul class="list-group list-group-flush">';
+                for (let ev of eventosList) {
+                    html += `<li class="list-group-item"><i class="mdi mdi-chevron-right text-primary"></i> ${ev}</li>`;
+                }
+                html += '</ul>';
+                body.innerHTML = html;
+            } else {
+                body.innerHTML = '<span class="text-muted">Sin eventos registrados para este día.</span>';
+            }
+        }
+    </script>
+}

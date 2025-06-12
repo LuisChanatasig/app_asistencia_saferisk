@@ -14,6 +14,7 @@ public partial class AppAsistenciaDbContext : DbContext
         : base(options)
     {
     }
+    public DbSet<ReporteJornadaDto> reporteJornadaDtos { get; set; }
 
     public virtual DbSet<Evento> Eventos { get; set; }
 
@@ -31,6 +32,8 @@ public partial class AppAsistenciaDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<ReporteJornadaDto>().HasNoKey();
+
         modelBuilder.Entity<Evento>(entity =>
         {
             entity.HasKey(e => e.EventoId).HasName("PK__evento__1850C3AD5558AE45");

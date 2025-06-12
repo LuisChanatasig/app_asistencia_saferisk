@@ -10,6 +10,7 @@ builder.Services.AddDbContext<AppAsistenciaDbContext>(options =>
 //Servicios
 builder.Services.AddScoped<AutenticacionService>();
 builder.Services.AddScoped<JornadaService>();
+builder.Services.AddScoped<ReporteService>();
 
 //Configuracion tiempo de sesion
 builder.Services.AddSession(options =>
