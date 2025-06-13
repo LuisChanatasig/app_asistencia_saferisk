@@ -33,6 +33,7 @@ public partial class AppAsistenciaDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<ReporteJornadaDto>().HasNoKey();
+        modelBuilder.Entity<ReporteJornadaResumenDto>().HasNoKey();
 
         modelBuilder.Entity<Evento>(entity =>
         {

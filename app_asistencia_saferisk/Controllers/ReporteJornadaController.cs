@@ -1,4 +1,5 @@
-﻿using app_asistencia_saferisk.Servicios;
+﻿using app_asistencia_saferisk.Models;
+using app_asistencia_saferisk.Servicios;
 using Microsoft.AspNetCore.Mvc;
 
 namespace app_asistencia_saferisk.Controllers
@@ -12,22 +13,31 @@ namespace app_asistencia_saferisk.Controllers
             _servicio = servicio;
         }
 
+
         [HttpGet]
         public async Task<IActionResult> ReporteAsistencia(DateTime? fechaInicio, DateTime? fechaFin, int? usuarioId)
         {
-            // Si no envían fechas, pone la semana actual
             var inicio = fechaInicio ?? DateTime.Today.AddDays(-7);
             var fin = fechaFin ?? DateTime.Today;
-            var model = await _servicio.ObtenerReporteAsync(inicio, fin, usuarioId);
+            var (detalles, resumen) = await _servicio.ObtenerReporteADOAsync(inicio, fin, usuarioId);
+
+            var model = new ReporteJornadaViewModel
+            {
+                Detalles = detalles,
+                Resumen = resumen
+            };
+
             return View(model);
         }
 
 
-        [HttpGet]
-        public async Task<IActionResult> Get(DateTime fechaInicio, DateTime fechaFin, int? usuarioId = null)
-        {
-            var data = await _servicio.ObtenerReporteAsync(fechaInicio, fechaFin, usuarioId);
-            return Ok(data);
-        }
+
+        //[HttpGet]
+        //public async Task<IActionResult> Get(DateTime fechaInicio, DateTime fechaFin, int? usuarioId = null)
+        //{
+        //    var data = await _servicio.ObtenerReporteAsync(fechaInicio, fechaFin, usuarioId);
+        //    return Ok(data);
+        //}
+
     }
 }
