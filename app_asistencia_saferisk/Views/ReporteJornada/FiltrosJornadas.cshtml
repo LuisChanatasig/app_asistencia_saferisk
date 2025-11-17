@@ -1,0 +1,39 @@
+﻿@model app_asistencia_saferisk.Models.ReporteJornadaViewModel
+
+<div class="offcanvas offcanvas-start" tabindex="-1" id="offcanvasFiltros" aria-labelledby="offcanvasFiltrosLabel">
+    <div class="offcanvas-header">
+        <h5 class="offcanvas-title" id="offcanvasFiltrosLabel">
+            <i class="mdi mdi-filter"></i> Filtros
+        </h5>
+        <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Cerrar"></button>
+    </div>
+    <div class="offcanvas-body">
+        <form id="formFiltrosJornadas" method="get">
+            <div class="mb-3">
+                <label class="form-label">Usuarios:</label>
+                @foreach (var u in Model.Usuarios)
+                {
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="usuarioId" value="@u.UsuarioId"
+                        @(Model.UsuarioId == u.UsuarioId ? "checked" : "")
+                               id="chk_u_@u.UsuarioId" />
+                        <label class="form-check-label" for="chk_u_@u.UsuarioId">@u.Nombres</label>
+                    </div>
+                }
+            </div>
+            <div class="mb-3">
+                <label asp-for="FechaInicio" class="form-label">Fecha Inicio:</label>
+                <input asp-for="FechaInicio" class="form-control" type="date" />
+            </div>
+            <div class="mb-3">
+                <label asp-for="FechaFin" class="form-label">Fecha Fin:</label>
+                <input asp-for="FechaFin" class="form-control" type="date" />
+            </div>
+            <button type="submit" class="btn btn-primary">Aplicar Filtros</button>
+        </form>
+        <div class="form-check form-switch mt-3">
+            <input class="form-check-input" type="checkbox" id="pinOffcanvas" />
+            <label class="form-check-label" for="pinOffcanvas">Anclar panel</label>
+        </div>
+    </div>
+</div>
