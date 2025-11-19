@@ -9,6 +9,7 @@ let tipoJornadaActual = null; // oficina, remoto, mixto
 let enTraslado = false;
 let trasladoInicioTimestamp = null;
 let enPermiso = false; // NUEVO ESTADO
+let enSoporteTecnico = false; // Add this global variable
 
 
 // ---- INICIALIZACIÓN ----
@@ -220,7 +221,7 @@ async function handleRegistrarExtra() {
     try {
         let obs = document.getElementById('extraObservaciones').value.trim();
 
-        if (["otro", "permiso"].includes(tipoEventoSeleccionado) && !obs) {
+        if (["otro", "permiso", "soporte_/_inspeccion_inicio"].includes(tipoEventoSeleccionado) && !obs) { // Add "soporte_/_inspeccion_inicio" here
             showToast('Debes ingresar una observación.', 'warning');
             document.getElementById('extraObservaciones').focus();
             return;
@@ -246,9 +247,18 @@ async function handleRegistrarExtra() {
             enTraslado = false;
             if (obs.includes("remoto")) tipoJornadaActual = "remoto";
             else tipoJornadaActual = "oficina";
+        } else if (tipoEventoSeleccionado === "permiso") {
+            enPermiso = true;
+        } else if (tipoEventoSeleccionado === "permiso_fin") {
+            enPermiso = false;
+        } else if (tipoEventoSeleccionado === "soporte_inspeccion_inicio") { // Update enSoporteTecnico
+            enSoporteTecnico = true;
+        } else if (tipoEventoSeleccionado === "soporte_inspeccion_fin") { // Update enSoporteTecnico
+            enSoporteTecnico = false;
         }
 
-        await cargarYActualizarTimeline();
+
+        await cargarYActualizarTimeline(); // Re-fetch and re-render the timeline and buttons
 
         // LIMPIA selección visual y variable
         tipoEventoSeleccionado = null;
@@ -330,7 +340,8 @@ function cargarYActualizarTimeline() {
                 estadoAlmuerzo = "noIniciado";
                 estadoBreak = "noIniciado";
                 enTraslado = false;
-                enPermiso = false; // <-- importante
+                enPermiso = false;
+                enSoporteTecnico = false; // <-- Reset this state here
 
                 if (!eventos || !eventos.length) {
                     timelineCont.innerHTML = `<div class="text-center text-muted">Sin eventos registrados aún.</div>`;
@@ -342,6 +353,8 @@ function cargarYActualizarTimeline() {
 
                 let ultimoTraslado = null;
                 let ultimoCambioJornada = null;
+                let ultimoPermiso = null; // To track the last permit event
+                let ultimoSoporteTecnico = null; // To track the last support event
 
                 eventos.forEach(ev => {
                     // ---------- MAPA ----------
@@ -400,8 +413,15 @@ function cargarYActualizarTimeline() {
                     }
 
                     // PERMISO DINÁMICO
-                    if (ev.codigo === "permiso") enPermiso = true;
-                    if (ev.codigo === "permiso_fin") enPermiso = false;
+                    if (ev.codigo === "permiso" || ev.codigo === "permiso_fin") {
+                        ultimoPermiso = ev;
+                    }
+
+                    // SOPORTE TÉCNICO DINÁMICO
+                    if (ev.codigo === "soporte_inspeccion_inicio" || ev.codigo === "soporte_inspeccion_fin") {
+                        ultimoSoporteTecnico = ev;
+                    }
+
 
                     if (ev.descripcion && ev.descripcion.toLowerCase().includes("salida")) {
                         jornadaFinalizada = true;
@@ -426,10 +446,25 @@ function cargarYActualizarTimeline() {
                     }
                 }
 
+                // Update enPermiso based on the last permit event
+                if (ultimoPermiso) {
+                    enPermiso = (ultimoPermiso.codigo === "permiso");
+                } else {
+                    enPermiso = false;
+                }
+
+                // Update enSoporteTecnico based on the last support event
+                if (ultimoSoporteTecnico) {
+                    enSoporteTecnico = (ultimoSoporteTecnico.codigo === "soporte_inspeccion_inicio");
+                } else {
+                    enSoporteTecnico = false;
+                }
+
+
                 actualizarEstadosAlmuerzoBreak(eventos);
                 actualizarBotonAlmuerzo();
                 actualizarBotonBreak();
-                renderAccionesExtra();
+                renderAccionesExtra(); // Re-render the extra actions buttons
 
                 if (jornadaFinalizada) {
                     bloquearBotonesJornada();
@@ -437,7 +472,6 @@ function cargarYActualizarTimeline() {
 
                 resolve();
             }).catch(err => {
-                // Aquí caes si hubo error en el fetch o al parsear
                 timelineCont.innerHTML = `<div class="text-danger text-center">Error al cargar el timeline.<br>${err}</div>`;
                 console.error("Error en timelineHoy:", err);
                 resolve();
@@ -563,6 +597,12 @@ function renderAccionesExtra() {
     const cont = document.getElementById('accionesExtraBtns');
     cont.innerHTML = "";
 
+    // Remove these lines as they are now global variables
+    // let enTraslado = false;
+    // let tipoJornadaActual = "oficina";
+    // let enPermiso = false;
+    // let enSoporteTecnico = false;
+
     if (!enTraslado) {
         if (tipoJornadaActual === "oficina") {
             cont.innerHTML += `
@@ -607,13 +647,25 @@ function renderAccionesExtra() {
                 `;
     }
 
+    // ---- SOPORTE TÉCNICO DINÁMICO ----
+    if (!enSoporteTecnico) {
+        cont.innerHTML += `
+                    <button class="btn btn-outline-secondary w-100 mb-2" data-tipo="soporte_inspeccion_inicio">
+                        <i class="mdi mdi-laptop me-1"></i> Iniciar soporte técnico o inspección
+                    </button>
+                `;
+    } else {
+        cont.innerHTML += `
+                    <button class="btn btn-outline-success w-100 mb-2" data-tipo="soporte_inspeccion_fin">
+                        <i class="mdi mdi-laptop-check me-1"></i> Finalizar soporte técnico o inspección
+                    </button>
+                `;
+    }
+
     // Otros botones
     cont.innerHTML += `
     <button class="btn btn-outline-secondary w-100 mb-2" data-tipo="reunion">
         <i class="mdi mdi-account-group me-1"></i> Reunión
-    </button>
-    <button class="btn btn-outline-secondary w-100 mb-2" data-tipo="soporte técnico visita">
-        <i class="mdi mdi-laptop me-1"></i> Soporte técnico visita
     </button>
     <button class="btn btn-outline-dark w-100 mb-2" data-tipo="otro">
         <i class="mdi mdi-dots-horizontal me-1"></i> Otro
@@ -629,8 +681,12 @@ function renderAccionesExtra() {
 
             tipoEventoSeleccionado = this.getAttribute('data-tipo');
 
+            // Update the state variables based on the selected event type
+            enPermiso = (tipoEventoSeleccionado === "permiso");
+            enSoporteTecnico = (tipoEventoSeleccionado === "soporte_inspeccion_inicio"); // Corrected data-tipo
+
             // Observación solo para ciertos tipos
-            if (["otro", "permiso"].includes(tipoEventoSeleccionado)) {
+            if (["otro", "permiso", "soporte_inspeccion_inicio"].includes(tipoEventoSeleccionado)) {
                 document.getElementById('campoObservacion').style.display = 'block';
                 document.getElementById('extraObservaciones').focus();
             } else {
@@ -642,7 +698,6 @@ function renderAccionesExtra() {
         });
     });
 }
-
 
 
 // ---- Helpers ----

@@ -23,6 +23,16 @@ namespace app_asistencia_saferisk.Controllers
             return View();
         }
 
+        /// <summary>
+        /// Validates user credentials and initiates a session if authentication is successful.
+        /// </summary>
+        /// <remarks>On successful authentication, user session variables are set and the response
+        /// includes a redirect URL based on the user's role and attendance status. If authentication fails, the
+        /// response contains an error message. This method is intended to be called via HTTP POST.</remarks>
+        /// <param name="model">An object containing the user's login credentials, including identification and password information. Must
+        /// not be null.</param>
+        /// <returns>A JSON result indicating whether authentication was successful. If successful, includes a redirect URL for
+        /// the next page; otherwise, includes an error message.</returns>
         [HttpPost]
         public async Task<IActionResult> Validar([FromBody] LoginR model)
         {
@@ -58,13 +68,14 @@ namespace app_asistencia_saferisk.Controllers
                     {
                         case 3: // Empleado
                         case 4: // Sistemas
+                        case 2:   // Supervisor de área
                             redirectUrl = Url.Action("Index", "Home");
                             break;
                         case 1: // Gerencia
-                        case 2: // Supervisor de área
+                     
                         case 5: // Contabilidad
                         case 7: // Administrador
-                            redirectUrl = Url.Action("Panel", "Dashboard");
+                            redirectUrl = Url.Action("ReporteAsistencia", "ReporteJornada");
                             break;
                         default:
                             redirectUrl = Url.Action("Index", "Home");
