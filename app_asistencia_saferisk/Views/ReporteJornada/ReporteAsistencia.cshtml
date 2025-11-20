@@ -2,6 +2,9 @@
 @{
     ViewData["Title"] = "Reporte de Jornadas";
     Layout = "~/Views/Shared/_Layout.cshtml";
+
+    var totalJornadas = Model?.Detalles?.Count ?? 0;
+    var resumen = Model?.Resumen;
 }
 
 <link rel="stylesheet" href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap5.min.css" />
@@ -11,216 +14,311 @@
 
 <div class="container-xxl mt-4">
     <div class="card shadow border-0">
-        <div class="card-header bg-primary-subtle d-flex justify-content-between align-items-center py-3 sticky-top" style="z-index:9">
-            <h4 class="mb-0 text-primary">
-                <i class="mdi mdi-clipboard-text-outline align-middle me-2"></i> @ViewData["Title"]
-            </h4>
-            <span class="badge bg-info-subtle text-info fs-6">
-                <i class="mdi mdi-counter me-1"></i> Total Jornadas: <b>@Model?.Detalles?.Count ?? 0</b>
-            </span>
-            <button class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvasFiltros" aria-controls="offcanvasFiltros" aria-label="Abrir filtros">
-                <i class="mdi mdi-filter-variant"></i> Filtros
-            </button>
+        <div class="card-header bg-primary-subtle d-flex flex-wrap justify-content-between align-items-center gap-2 py-3 sticky-top" style="z-index:9">
+            <div class="d-flex flex-column flex-sm-row align-items-sm-center gap-2">
+                <h4 class="mb-0 text-primary">
+                    <i class="mdi mdi-clipboard-text-outline align-middle me-2"></i> @ViewData["Title"]
+                </h4>
+                <span class="badge bg-light text-muted">
+                    <i class="mdi mdi-calendar-range me-1"></i>
+                    @Model.FechaInicio.ToString("yyyy-MM-dd") - @Model.FechaFin.ToString("yyyy-MM-dd")
+                </span>
+            </div>
+
+            <div class="d-flex flex-wrap align-items-center gap-2">
+                <span class="badge bg-info-subtle text-info">
+                    <i class="mdi mdi-counter me-1"></i>
+                    Jornadas: <b>@totalJornadas</b>
+                </span>
+                @if (resumen != null)
+                {
+                    <span class="badge bg-success-subtle text-success">
+                        <i class="mdi mdi-account-group-outline me-1"></i>
+                        Usuarios: <b>@resumen.TotalUsuarios</b>
+                    </span>
+                    <span class="badge bg-warning-subtle text-warning">
+                        <i class="mdi mdi-clock-time-three-outline me-1"></i>
+                        Horas netas: <b>@(resumen.TotalHorasNetas?.ToString("N1") ?? "0")</b>
+                    </span>
+                }
+                <button class="btn btn-outline-primary btn-sm" type="button"
+                        data-bs-toggle="offcanvas" data-bs-target="#offcanvasFiltros"
+                        aria-controls="offcanvasFiltros" aria-label="Abrir filtros">
+                    <i class="mdi mdi-filter-variant"></i> Filtros
+                </button>
+            </div>
         </div>
+
         <div class="card-body pb-2">
 
             <ul class="nav nav-tabs mb-3" id="reportTabs" role="tablist">
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link active" id="detalles-tab" data-bs-toggle="tab" data-bs-target="#detalles" type="button" role="tab" aria-controls="detalles" aria-selected="true">
+                    <button class="nav-link active" id="detalles-tab" data-bs-toggle="tab" data-bs-target="#detalles"
+                            type="button" role="tab" aria-controls="detalles" aria-selected="true">
                         <i class="mdi mdi-format-list-bulleted me-1"></i> Detalles
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="resumen-total-tab" data-bs-toggle="tab" data-bs-target="#resumen-total" type="button" role="tab" aria-controls="resumen-total" aria-selected="false">
+                    <button class="nav-link" id="resumen-total-tab" data-bs-toggle="tab" data-bs-target="#resumen-total"
+                            type="button" role="tab" aria-controls="resumen-total" aria-selected="false">
                         <i class="mdi mdi-chart-donut me-1"></i> Resumen Total
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="resumen-mensual-tab" data-bs-toggle="tab" data-bs-target="#resumen-mensual" type="button" role="tab" aria-controls="resumen-mensual" aria-selected="false">
+                    <button class="nav-link" id="resumen-mensual-tab" data-bs-toggle="tab" data-bs-target="#resumen-mensual"
+                            type="button" role="tab" aria-controls="resumen-mensual" aria-selected="false">
                         <i class="mdi mdi-calendar-range me-1"></i> Resumen Mensual
                     </button>
                 </li>
             </ul>
 
             <div class="tab-content" id="reportTabsContent">
+                <!-- TAB DETALLES -->
                 <div class="tab-pane fade show active" id="detalles" role="tabpanel" aria-labelledby="detalles-tab">
-                    <table id="tblJornadas" class="table nowrap dt-responsive align-middle table-hover table-bordered" style="width:100%">
-                        <caption class="visually-hidden">Reporte de jornadas laborales</caption>
-                        <thead class="table-light border-top text-center align-middle">
-                            <tr>
-                                <th>Usuario</th>
-                                <th>Fecha</th>
-                                <th>Jornada</th>
-                                <th>Entrada</th>
-                                <th>Salida</th>
-                                <th>Puntualidad</th>
-                                <th>Horas Netas</th>
-                                <th>% Cumplimiento</th>
-                                <th>Semáforo</th>
-                                <th>Detalles</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @if (Model?.Detalles == null || !Model.Detalles.Any())
-                            {
+                    <div class="table-responsive">
+                        <table id="tblJornadas" class="table nowrap dt-responsive align-middle table-hover table-bordered w-100">
+                            <caption class="visually-hidden">Reporte de jornadas laborales</caption>
+                            <thead class="table-light border-top text-center align-middle">
                                 <tr>
-                                    <td colspan="10" class="text-center text-muted py-4">
-                                        <i class="mdi mdi-information-outline me-1"></i>
-                                        No existen jornadas en el rango seleccionado.
-                                    </td>
+                                    <th>Usuario</th>
+                                    <th>Fecha</th>
+                                    <th>Jornada</th>
+                                    <th>Entrada</th>
+                                    <th>Salida</th>
+                                    <th>Puntualidad</th>
+                                    <th>Horas Netas</th>
+                                    <th>% Cumplimiento</th>
+                                    <th>Semáforo</th>
+                                    <th>Detalles</th>
                                 </tr>
-                            }
-                            else
-                            {
-                                foreach (var item in Model.Detalles)
+                            </thead>
+                            <tbody>
+                                @if (Model?.Detalles == null || !Model.Detalles.Any())
                                 {
-                                    var colorClase = item.Semaforo?.ToLower() switch
-                                    {
-                                        "verde" => "text-success",
-                                        "amarillo" => "text-warning",
-                                        "rojo" => "text-danger",
-                                        _ => "text-muted"
-                                    };
                                     <tr>
-                                        <td>@item.NombreUsuario</td>
-                                        <td class="text-nowrap">
-                                            <i class="mdi mdi-calendar-outline me-1"></i>@item.Fecha?.ToString("yyyy-MM-dd")
+                                        <td colspan="10" class="text-center text-muted py-4">
+                                            <i class="mdi mdi-information-outline me-1"></i>
+                                            No existen jornadas en el rango seleccionado.
                                         </td>
-                                        <td>@item.TipoJornada</td>
-                                        <td>@item.HoraEntrada?.ToString(@"hh\:mm")</td>
-                                        <td>@item.HoraSalida?.ToString(@"hh\:mm")</td>
-                                        <td>@item.Puntualidad</td>
-                                        <td class="text-end">
-                                            <i class="mdi mdi-clock-time-three-outline me-1"></i>@item.HorasNetas?.ToString("0.00")
-                                        </td>
-                                        <td class="text-end">
-                                            <i class="mdi mdi-percent me-1"></i>@item.PorcentajeCumplimiento?.ToString("0.##")%
-                                        </td>
-                                        <td class="text-center">
-                                            <i class="mdi mdi-circle-medium @colorClase"></i> @item.Semaforo
-                                        </td>
-                                        <td class="text-center">
-                                            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalDetalle-@item.JornadaId">
-                                                <i class="mdi mdi-eye-outline"></i>
-                                            </button>
+                                    </tr>
+                                }
+                                else
+                                {
+                                    foreach (var item in Model.Detalles)
+                                    {
+                                        var colorClase = item.Semaforo?.ToLower() switch
+                                        {
+                                            "verde" => "text-success",
+                                            "amarillo" => "text-warning",
+                                            "rojo" => "text-danger",
+                                            _ => "text-muted"
+                                        };
 
-                                            <div class="modal fade" id="modalDetalle-@item.JornadaId" tabindex="-1" aria-labelledby="modalLabel-@item.JornadaId" aria-hidden="true">
-                                                <div class="modal-dialog modal-lg modal-dialog-scrollable">
-                                                    <div class="modal-content">
-                                                        <div class="modal-header bg-success text-white">
-                                                            <h5 class="modal-title" id="modalLabel-@item.JornadaId">
-                                                                <i class="mdi mdi-account-clock-outline me-2"></i> Detalle Jornada - @item.NombreUsuario
-                                                            </h5>
-                                                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
-                                                        </div>
-                                                        <div class="modal-body small">
-                                                            <div class="row g-2">
-                                                                <div class="col-md-6">
-                                                                    <strong><i class="mdi mdi-calendar-outline me-1"></i>Fecha:</strong> @item.Fecha?.ToString("yyyy-MM-dd")<br />
-                                                                    <strong><i class="mdi mdi-briefcase-outline me-1"></i>Tipo:</strong> @item.TipoJornada<br />
-                                                                    <strong><i class="mdi mdi-check-circle-outline me-1"></i>Estado:</strong> @item.EstadoJornada
-                                                                </div>
-                                                                <div class="col-md-6">
-                                                                    <strong><i class="mdi mdi-login me-1"></i>Entrada:</strong> @item.HoraEntrada?.ToString(@"hh\:mm")<br />
-                                                                    <strong><i class="mdi mdi-logout me-1"></i>Salida:</strong> @item.HoraSalida?.ToString(@"hh\:mm")<br />
-                                                                    <strong><i class="mdi mdi-traffic-light-outline me-1"></i>Semáforo:</strong> <span class="@colorClase">@item.Semaforo</span>
-                                                                </div>
+                                        var badgePuntualidad = item.Puntualidad?.ToUpper() == "SI"
+                                        ? "<span class=\"badge bg-success-subtle text-success\">Puntual</span>"
+                                        : "<span class=\"badge bg-danger-subtle text-danger\">Impuntual</span>";
+
+                                        <tr>
+                                            <td>@item.NombreUsuario</td>
+                                            <td class="text-nowrap">
+                                                <i class="mdi mdi-calendar-outline me-1"></i>
+                                                @item.Fecha?.ToString("yyyy-MM-dd")
+                                            </td>
+                                            <td>@item.TipoJornada</td>
+                                            <td>@item.HoraEntrada?.ToString(@"hh\:mm")</td>
+                                            <td>@item.HoraSalida?.ToString(@"hh\:mm")</td>
+                                            <td class="text-center">
+                                                @Html.Raw(badgePuntualidad)
+                                            </td>
+                                            <td class="text-end">
+                                                <i class="mdi mdi-clock-time-three-outline me-1"></i>
+                                                @item.HorasNetas?.ToString("0.00")
+                                            </td>
+                                            <td class="text-end">
+                                                <i class="mdi mdi-percent me-1"></i>
+                                                @item.PorcentajeCumplimiento?.ToString("0.##")%
+                                            </td>
+                                            <td class="text-center">
+                                                <i class="mdi mdi-circle-medium @colorClase"></i> @item.Semaforo
+                                            </td>
+                                            <td class="text-center">
+                                                <button type="button"
+                                                        class="btn btn-sm btn-outline-primary"
+                                                        data-bs-toggle="modal"
+                                                        data-bs-target="#modalDetalle-@item.JornadaId">
+                                                    <i class="mdi mdi-eye-outline"></i>
+                                                </button>
+
+                                                <!-- Modal Detalle -->
+                                                <div class="modal fade" id="modalDetalle-@item.JornadaId" tabindex="-1"
+                                                     aria-labelledby="modalLabel-@item.JornadaId" aria-hidden="true">
+                                                    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                                                        <div class="modal-content">
+                                                            <div class="modal-header bg-success text-white">
+                                                                <h5 class="modal-title" id="modalLabel-@item.JornadaId">
+                                                                    <i class="mdi mdi-account-clock-outline me-2"></i>
+                                                                    Detalle Jornada - @item.NombreUsuario (@item.Fecha?.ToString("yyyy-MM-dd"))
+                                                                </h5>
+                                                                <button type="button" class="btn-close btn-close-white"
+                                                                        data-bs-dismiss="modal" aria-label="Cerrar"></button>
                                                             </div>
-                                                            <hr />
-                                                            <div class="row g-2">
-                                                                <div class="col-md-3">
-                                                                    <strong><i class="mdi mdi-clock-alert-outline me-1"></i>Atraso:</strong> @item.MinutosAtraso
+                                                            <div class="modal-body small">
+                                                                <div class="row g-2 mb-2">
+                                                                    <div class="col-md-6">
+                                                                        <strong><i class="mdi mdi-calendar-outline me-1"></i>Fecha:</strong>
+                                                                        @item.Fecha?.ToString("yyyy-MM-dd")<br />
+                                                                        <strong><i class="mdi mdi-briefcase-outline me-1"></i>Tipo:</strong>
+                                                                        @item.TipoJornada<br />
+                                                                        <strong><i class="mdi mdi-check-circle-outline me-1"></i>Estado:</strong>
+                                                                        @item.EstadoJornada
+                                                                    </div>
+                                                                    <div class="col-md-6">
+                                                                        <strong><i class="mdi mdi-login me-1"></i>Entrada:</strong>
+                                                                        @item.HoraEntrada?.ToString(@"hh\:mm")<br />
+                                                                        <strong><i class="mdi mdi-logout me-1"></i>Salida:</strong>
+                                                                        @item.HoraSalida?.ToString(@"hh\:mm")<br />
+                                                                        <strong><i class="mdi mdi-traffic-light-outline me-1"></i>Semáforo:</strong>
+                                                                        <span class="@colorClase">@item.Semaforo</span>
+                                                                    </div>
                                                                 </div>
-                                                                <div class="col-md-3">
-                                                                    <strong><i class="mdi mdi-food-variant me-1"></i>Almuerzo:</strong> @item.MinutosAlmuerzo
-                                                                </div>
-                                                                <div class="col-md-3">
-                                                                    <strong><i class="mdi mdi-coffee-outline me-1"></i>Break:</strong> @item.MinutosBreak
-                                                                </div>
-                                                                <div class="col-md-3">
-                                                                    <strong><i class="mdi mdi-walk me-1"></i>Permiso:</strong> @item.MinutosPermiso
-                                                                </div>
-                                                                <div class="col-md-3">
-                                                                    <strong><i class="mdi mdi-truck-outline me-1"></i>Traslado:</strong> @item.MinutosTraslado
-                                                                </div>
-                                                                <div class="col-md-3">
-                                                                    <strong><i class="mdi mdi-lan-connect me-1"></i>IP Entrada:</strong> @item.IpEntrada
-                                                                </div>
-                                                                <div class="col-md-3">
-                                                                    <strong><i class="mdi mdi-crosshairs-gps me-1"></i>GPS:</strong> @item.LatEntrada, @item.LonEntrada
-                                                                </div>
-                                                                <div class="col-md-6">
-                                                                    <strong><i class="mdi mdi-map-marker-outline me-1"></i>Ubicación:</strong> @item.UbicacionOficina
-                                                                </div>
-                                                                <div class="col-md-12">
-                                                                    <strong><i class="mdi mdi-calendar-clock-outline me-1"></i>Evento:</strong> @item.EventosDelDia
-                                                                </div>
-                                                                <div class="col-md-12">
-                                                                    <strong><i class="mdi mdi-note-text-outline me-1"></i>Observaciones:</strong> @item.Observaciones
+                                                                <hr />
+                                                                <div class="row g-2">
+                                                                    <div class="col-md-3">
+                                                                        <strong><i class="mdi mdi-clock-alert-outline me-1"></i>Atraso:</strong>
+                                                                        @item.MinutosAtraso min
+                                                                    </div>
+                                                                    <div class="col-md-3">
+                                                                        <strong><i class="mdi mdi-food-variant me-1"></i>Almuerzo:</strong>
+                                                                        @item.MinutosAlmuerzo min
+                                                                    </div>
+                                                                    <div class="col-md-3">
+                                                                        <strong><i class="mdi mdi-coffee-outline me-1"></i>Break:</strong>
+                                                                        @item.MinutosBreak min
+                                                                    </div>
+                                                                    <div class="col-md-3">
+                                                                        <strong><i class="mdi mdi-walk me-1"></i>Permiso:</strong>
+                                                                        @item.MinutosPermiso min
+                                                                    </div>
+                                                                    <div class="col-md-3">
+                                                                        <strong><i class="mdi mdi-truck-outline me-1"></i>Traslado:</strong>
+                                                                        @item.MinutosTraslado min
+                                                                    </div>
+                                                                    <div class="col-md-3">
+                                                                        <strong><i class="mdi mdi-account-tie-voice me-1"></i>Reunión:</strong>
+                                                                        @item.MinutosReunion min
+                                                                    </div>
+                                                                    <div class="col-md-3">
+                                                                        <strong><i class="mdi mdi-lan-connect me-1"></i>IP Entrada:</strong>
+                                                                        @item.IpEntrada
+                                                                    </div>
+                                                                    <div class="col-md-3">
+                                                                        <strong><i class="mdi mdi-crosshairs-gps me-1"></i>GPS:</strong>
+                                                                        @item.LatEntrada, @item.LonEntrada
+                                                                    </div>
+                                                                    <div class="col-md-6">
+                                                                        <strong><i class="mdi mdi-map-marker-outline me-1"></i>Ubicación:</strong>
+                                                                        @item.UbicacionOficina
+                                                                    </div>
+                                                                    <div class="col-md-12">
+                                                                        <strong><i class="mdi mdi-calendar-clock-outline me-1"></i>Eventos del día:</strong><br />
+                                                                        @item.EventosDelDia
+                                                                    </div>
+                                                                    <div class="col-md-12">
+                                                                        <strong><i class="mdi mdi-note-text-outline me-1"></i>Observaciones:</strong><br />
+                                                                        @item.Observaciones
+                                                                    </div>
                                                                 </div>
                                                             </div>
                                                         </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        </td>
-                                    </tr>
+                                                <!-- /Modal Detalle -->
+                                            </td>
+                                        </tr>
+                                    }
                                 }
-                            }
-                        </tbody>
-                    </table>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
 
+                <!-- TAB RESUMEN TOTAL -->
                 <div class="tab-pane fade" id="resumen-total" role="tabpanel" aria-labelledby="resumen-total-tab">
-                    <h5 class="mb-3 text-primary"><i class="mdi mdi-chart-box-outline me-2"></i>Resumen General del Periodo</h5>
-                    @if (Model?.Resumen != null)
+                    <h5 class="mb-3 text-primary">
+                        <i class="mdi mdi-chart-box-outline me-2"></i>Resumen General del Periodo
+                    </h5>
+                    @if (resumen != null)
                     {
                         <div class="row g-3">
                             <div class="col-md-4">
                                 <div class="card h-100 bg-light border-primary">
                                     <div class="card-body">
-                                        <h6 class="card-title text-primary"><i class="mdi mdi-counter me-1"></i>Total Jornadas Registradas</h6>
-                                        <p class="card-text fs-4 text-primary"><b>@Model.Resumen.TotalJornadas</b></p>
+                                        <h6 class="card-title text-primary">
+                                            <i class="mdi mdi-counter me-1"></i>Total Jornadas Registradas
+                                        </h6>
+                                        <p class="card-text fs-4 text-primary mb-0">
+                                            <b>@resumen.TotalJornadas</b>
+                                        </p>
                                     </div>
                                 </div>
                             </div>
                             <div class="col-md-4">
                                 <div class="card h-100 bg-light border-primary">
                                     <div class="card-body">
-                                        <h6 class="card-title text-primary"><i class="mdi mdi-account-group-outline me-1"></i>Total Usuarios Activos</h6>
-                                        <p class="card-text fs-4 text-primary"><b>@Model.Resumen.TotalUsuarios</b></p>
+                                        <h6 class="card-title text-primary">
+                                            <i class="mdi mdi-account-group-outline me-1"></i>Total Usuarios Activos
+                                        </h6>
+                                        <p class="card-text fs-4 text-primary mb-0">
+                                            <b>@resumen.TotalUsuarios</b>
+                                        </p>
                                     </div>
                                 </div>
                             </div>
                             <div class="col-md-4">
                                 <div class="card h-100 bg-light border-primary">
                                     <div class="card-body">
-                                        <h6 class="card-title text-primary"><i class="mdi mdi-clock-time-three-outline me-1"></i>Horas Netas Totales</h6>
-                                        <p class="card-text fs-4 text-primary"><b>@(Model.Resumen.TotalHorasNetas?.ToString("N2") ?? "N/A")</b> hrs</p>
+                                        <h6 class="card-title text-primary">
+                                            <i class="mdi mdi-clock-time-three-outline me-1"></i>Horas Netas Totales
+                                        </h6>
+                                        <p class="card-text fs-4 text-primary mb-0">
+                                            <b>@(resumen.TotalHorasNetas?.ToString("N2") ?? "N/A")</b> hrs
+                                        </p>
                                     </div>
                                 </div>
                             </div>
                             <div class="col-md-4">
                                 <div class="card h-100 bg-light border-info">
                                     <div class="card-body">
-                                        <h6 class="card-title text-info"><i class="mdi mdi-clock-start me-1"></i>Promedio Horas Netas/Jornada</h6>
-                                        <p class="card-text fs-4 text-info"><b>@(Model.Resumen.PromedioHorasNetas?.ToString("N2") ?? "N/A")</b> hrs</p>
+                                        <h6 class="card-title text-info">
+                                            <i class="mdi mdi-clock-start me-1"></i>Promedio Horas Netas/Jornada
+                                        </h6>
+                                        <p class="card-text fs-4 text-info mb-0">
+                                            <b>@(resumen.PromedioHorasNetas?.ToString("N2") ?? "N/A")</b> hrs
+                                        </p>
                                     </div>
                                 </div>
                             </div>
                             <div class="col-md-4">
                                 <div class="card h-100 bg-light border-success">
                                     <div class="card-body">
-                                        <h6 class="card-title text-success"><i class="mdi mdi-check-decagram-outline me-1"></i>% Cumplimiento Promedio</h6>
-                                        <p class="card-text fs-4 text-success"><b>@(Model.Resumen.PorcentajeCumplimientoPromedio?.ToString("N1") ?? "N/A")%</b></p>
+                                        <h6 class="card-title text-success">
+                                            <i class="mdi mdi-check-decagram-outline me-1"></i>% Cumplimiento Promedio
+                                        </h6>
+                                        <p class="card-text fs-4 text-success mb-0">
+                                            <b>@(resumen.PorcentajeCumplimientoPromedio?.ToString("N1") ?? "N/A")%</b>
+                                        </p>
                                     </div>
                                 </div>
                             </div>
                             <div class="col-md-4">
                                 <div class="card h-100 bg-light border-warning">
                                     <div class="card-body">
-                                        <h6 class="card-title text-warning"><i class="mdi mdi-timer-check-outline me-1"></i>% Puntualidad Promedio</h6>
-                                        <p class="card-text fs-4 text-warning"><b>@(Model.Resumen.PorcentajePuntualidad?.ToString("N1") ?? "N/A")%</b></p>
+                                        <h6 class="card-title text-warning">
+                                            <i class="mdi mdi-timer-check-outline me-1"></i>% Puntualidad Promedio
+                                        </h6>
+                                        <p class="card-text fs-4 text-warning mb-0">
+                                            <b>@(resumen.PorcentajePuntualidad?.ToString("N1") ?? "N/A")%</b>
+                                        </p>
                                     </div>
                                 </div>
                             </div>
@@ -234,13 +332,18 @@
                     }
                 </div>
 
+                <!-- TAB RESUMEN MENSUAL -->
                 <div class="tab-pane fade" id="resumen-mensual" role="tabpanel" aria-labelledby="resumen-mensual-tab">
-                    <h5 class="mb-3 text-primary"><i class="mdi mdi-calendar-month-outline me-2"></i>Resumen por Mes</h5>
+                    <h5 class="mb-3 text-primary">
+                        <i class="mdi mdi-calendar-month-outline me-2"></i>Resumen por Mes
+                    </h5>
                     @if (Model?.ResumenMensual != null && Model.ResumenMensual.Any())
                     {
                         <div class="table-responsive">
                             <table class="table table-striped table-bordered align-middle table-hover caption-top">
-                                <caption class="text-start mb-2">Tabla de promedios y totales por cada mes dentro del rango seleccionado.</caption>
+                                <caption class="text-start mb-2">
+                                    Tabla de promedios y totales por cada mes dentro del rango seleccionado.
+                                </caption>
                                 <thead class="table-dark">
                                     <tr>
                                         <th>Mes</th>
@@ -260,11 +363,11 @@
                                             <td><b>@mesResumen.Mes</b></td>
                                             <td class="text-end">@mesResumen.JornadasEnMes</td>
                                             <td class="text-end">@mesResumen.UsuariosActivosEnMes</td>
-                                            <td class="text-end">@(mesResumen.TotalHorasNetasMes?.ToString("N2"))</td>
-                                            <td class="text-end">@(mesResumen.PromedioHorasNetasPorJornadaMes?.ToString("N2"))</td>
-                                            <td class="text-end text-success">@(mesResumen.PorcentajeCumplimientoPromedioMes?.ToString("N1"))%</td>
+                                            <td class="text-end">@mesResumen.TotalHorasNetasMes?.ToString("N2")</td>
+                                            <td class="text-end">@mesResumen.PromedioHorasNetasPorJornadaMes?.ToString("N2")</td>
+                                            <td class="text-end text-success">@mesResumen.PorcentajeCumplimientoPromedioMes?.ToString("N1")%</td>
                                             <td class="text-end">@mesResumen.JornadasPuntualesEnMes</td>
-                                            <td class="text-end text-warning">@(mesResumen.PorcentajePuntualidadMes?.ToString("N1"))%</td>
+                                            <td class="text-end text-warning">@mesResumen.PorcentajePuntualidadMes?.ToString("N1")%</td>
                                         </tr>
                                     }
                                 </tbody>
@@ -301,22 +404,45 @@
 
     <script>
         $(function () {
-            // Inicializar DataTables solo para la tabla de Detalles (tblJornadas)
-            $('#tblJornadas').DataTable({
-                language: { url: "//cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json" },
-                pageLength: 10,
-                responsive: true,
-                fixedHeader: true,
-                dom: 'Bfrtip',
-                order: [], // No ordenar inicialmente, ya viene ordenado por fecha descendente del SP
-                buttons: [
-                    { extend: 'copy', className: 'btn btn-secondary btn-sm', text: '<i class="mdi mdi-content-copy"></i> Copiar' },
-                    { extend: 'csv', className: 'btn btn-success btn-sm', text: '<i class="mdi mdi-file-delimited-outline"></i> CSV' },
-                    { extend: 'excel', className: 'btn btn-info btn-sm', text: '<i class="mdi mdi-file-excel-outline"></i> Excel' },
-                    { extend: 'pdf', className: 'btn btn-danger btn-sm', text: '<i class="mdi mdi-file-pdf-outline"></i> PDF' },
-                    { extend: 'print', className: 'btn btn-primary btn-sm', text: '<i class="mdi mdi-printer"></i> Imprimir' }
-                ]
-            });
+            var $tabla = $('#tblJornadas');
+            if ($tabla.length) {
+                $tabla.DataTable({
+                    language: { url: "//cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json" },
+                    pageLength: 10,
+                    responsive: true,
+                    fixedHeader: true,
+                    deferRender: true,
+                    dom: 'Bfrtip',
+                    order: [[1, "desc"]], // columna Fecha
+                    buttons: [
+                        {
+                            extend: 'copy',
+                            className: 'btn btn-secondary btn-sm',
+                            text: '<i class="mdi mdi-content-copy"></i> Copiar'
+                        },
+                        {
+                            extend: 'csv',
+                            className: 'btn btn-success btn-sm',
+                            text: '<i class="mdi mdi-file-delimited-outline"></i> CSV'
+                        },
+                        {
+                            extend: 'excel',
+                            className: 'btn btn-info btn-sm',
+                            text: '<i class="mdi mdi-file-excel-outline"></i> Excel'
+                        },
+                        {
+                            extend: 'pdf',
+                            className: 'btn btn-danger btn-sm',
+                            text: '<i class="mdi mdi-file-pdf-outline"></i> PDF'
+                        },
+                        {
+                            extend: 'print',
+                            className: 'btn btn-primary btn-sm',
+                            text: '<i class="mdi mdi-printer"></i> Imprimir'
+                        }
+                    ]
+                });
+            }
         });
     </script>
 }

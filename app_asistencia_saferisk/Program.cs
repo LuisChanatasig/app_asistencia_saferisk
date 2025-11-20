@@ -1,3 +1,4 @@
+using app_asistencia_saferisk.Hubs;
 using app_asistencia_saferisk.Models;
 using app_asistencia_saferisk.Servicios;
 using Microsoft.EntityFrameworkCore;
@@ -11,6 +12,7 @@ builder.Services.AddDbContext<AppAsistenciaDbContext>(options =>
 builder.Services.AddScoped<AutenticacionService>();
 builder.Services.AddScoped<JornadaService>();
 builder.Services.AddScoped<ReporteService>();
+builder.Services.AddScoped<SolicitudAjusteService>();
 
 //Configuracion tiempo de sesion
 builder.Services.AddSession(options =>
@@ -23,6 +25,8 @@ builder.Services.AddSession(options =>
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
+builder.Services.AddSignalR(); // <-- importante
+
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddLogging();
 var app = builder.Build();
@@ -49,4 +53,6 @@ app.UseEndpoints(endpoints =>
         name: "default",
         pattern: "{controller=Autenticacion}/{action=Login}/{id?}");
 });
+// Ruta del hub
+app.MapHub<NotificacionHub>("/notificacionesHub");
 app.Run();

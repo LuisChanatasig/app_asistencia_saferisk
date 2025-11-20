@@ -14,126 +14,201 @@ namespace app_asistencia_saferisk.Servicios
             _dbContext = dbContext;
         }
 
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="fechaInicio"></param>
-        /// <param name="fechaFin"></param>
-        /// <param name="usuarioId"></param>
-        /// <returns></returns>
+
 
         /// <summary>
-        /// Obtiene un reporte detallado de jornadas, un resumen total y un resumen mensual
-        /// desde la base de datos utilizando ADO.NET y un procedimiento almacenado.
+        /// Asynchronously retrieves a detailed workday report, including individual records, a total summary, and
+        /// monthly summaries, filtered by the specified criteria.
         /// </summary>
-        /// <param name="fechaInicio">Fecha de inicio del rango del reporte.</param>
-        /// <param name="fechaFin">Fecha de fin del rango del reporte.</param>
-        /// <param name="usuarioId">ID opcional del usuario para filtrar el reporte.</param>
-        /// <returns>Una tupla que contiene la lista de detalles de jornadas,
-        /// el objeto de resumen total y la lista de resúmenes mensuales.</returns>
-        public async Task<(List<ReporteJornadaDto> Detalles, ReporteJornadaResumenDto ResumenTotal, List<ReporteJornadaResumenMensualDto> ResumenMensual)> ObtenerReporteADOAsync(DateTime fechaInicio, DateTime fechaFin, int? usuarioId = null)
+        /// <remarks>This method executes the 'sp_ReporteJornadaNormal' stored procedure and returns
+        /// multiple result sets. The operation is performed asynchronously and is suitable for scenarios where large
+        /// report data may be retrieved. The returned data reflects the filters applied; omitting parameters broadens
+        /// the scope of the report.</remarks>
+        /// <param name="fechaInicio">The start date of the report period. If null, the current month is used as the default.</param>
+        /// <param name="fechaFin">The end date of the report period. If null, the current month is used as the default.</param>
+        /// <param name="usuarioId">The identifier of the user to filter the report. If null or 0, the report includes all users.</param>
+        /// <param name="tipoJornada">The type of workday to filter by. If null or empty, all types are included.</param>
+        /// <param name="estadoJornada">The workday status to filter by. If null or empty, all statuses are included.</param>
+        /// <returns>A tuple containing a list of detailed workday records, a total summary, and a list of monthly summaries. If
+        /// no data is found, the lists will be empty and the summary will contain zeroed values.</returns>
+        public async Task<(
+            List<ReporteJornadaDto> Detalles,
+            ReporteJornadaResumenDto ResumenTotal,
+            List<ReporteJornadaResumenMensualDto> ResumenMensual
+        )> ObtenerReporteADOAsync(
+            DateTime? fechaInicio = null,
+            DateTime? fechaFin = null,
+            int? usuarioId = null,
+            string? tipoJornada = null,
+            string? estadoJornada = null)
         {
             var listaDetalles = new List<ReporteJornadaDto>();
-            ReporteJornadaResumenDto resumenTotal = null;
+            ReporteJornadaResumenDto? resumenTotal = null;
             var listaResumenMensual = new List<ReporteJornadaResumenMensualDto>();
 
-            string connectionString = _dbContext.Database.GetConnectionString();
+            var connectionString = _dbContext.Database.GetConnectionString();
 
-            using (var conn = new SqlConnection(connectionString))
-            using (var cmd = new SqlCommand("sp_ReporteJornadaNormal", conn))
+            using var conn = new SqlConnection(connectionString);
+            using var cmd = new SqlCommand("sp_ReporteJornadaNormal", conn)
             {
-                cmd.CommandType = CommandType.StoredProcedure;
-                cmd.Parameters.AddWithValue("@fecha_inicio", fechaInicio);
-                cmd.Parameters.AddWithValue("@fecha_fin", fechaFin);
+                CommandType = CommandType.StoredProcedure
+            };
 
-                // Manejo de usuarioId: si es 0, se pasa DBNull.Value (o null en SQL Server), de lo contrario se pasa el valor.
-                // Esto es porque 0 podría ser un ID válido, pero usualmente en filtros significa "todos".
-                // La lógica '@usuario_id IS NULL OR j.usuario_id = @usuario_id' en el SP maneja el NULL.
-                cmd.Parameters.AddWithValue("@usuario_id", (object)(usuarioId == 0 ? null : usuarioId) ?? DBNull.Value);
+            // Fechas: si son null, el SP aplica sus valores por defecto (mes actual)
+            var pFechaInicio = cmd.Parameters.Add("@fecha_inicio", SqlDbType.Date);
+            pFechaInicio.Value = (object?)fechaInicio ?? DBNull.Value;
 
-                await conn.OpenAsync();
-                using (var reader = await cmd.ExecuteReaderAsync())
+            var pFechaFin = cmd.Parameters.Add("@fecha_fin", SqlDbType.Date);
+            pFechaFin.Value = (object?)fechaFin ?? DBNull.Value;
+
+            // usuario_id: null o 0 = todos
+            var pUsuarioId = cmd.Parameters.Add("@usuario_id", SqlDbType.Int);
+            if (usuarioId.HasValue && usuarioId.Value > 0)
+                pUsuarioId.Value = usuarioId.Value;
+            else
+                pUsuarioId.Value = DBNull.Value;
+
+            // tipo_jornada opcional
+            var pTipoJornada = cmd.Parameters.Add("@tipo_jornada", SqlDbType.VarChar, 20);
+            pTipoJornada.Value = string.IsNullOrWhiteSpace(tipoJornada)
+                ? (object)DBNull.Value
+                : tipoJornada;
+
+            // estado_jornada opcional
+            var pEstadoJornada = cmd.Parameters.Add("@estado_jornada", SqlDbType.VarChar, 20);
+            pEstadoJornada.Value = string.IsNullOrWhiteSpace(estadoJornada)
+                ? (object)DBNull.Value
+                : estadoJornada;
+
+            await conn.OpenAsync().ConfigureAwait(false);
+
+            using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
+
+            // --- 1) Detalle de jornadas ---
+            while (await reader.ReadAsync().ConfigureAwait(false))
+            {
+                var dto = new ReporteJornadaDto
                 {
-                    // --- Primer conjunto de resultados: Detalles de Jornadas ---
-                    while (await reader.ReadAsync())
-                    {
-                        var dto = new ReporteJornadaDto
-                        {
-                            JornadaId = reader.GetInt32(reader.GetOrdinal("JornadaId")),
-                            UsuarioId = reader.GetInt32(reader.GetOrdinal("UsuarioId")),
-                            NombreUsuario = reader["NombreUsuario"] as string,
-                            TipoJornada = reader["TipoJornada"] as string,
-                            Fecha = reader["Fecha"] == DBNull.Value ? null : (DateTime?)reader["Fecha"],
-                            EstadoJornada = reader["EstadoJornada"] as string,
-                            HoraEntrada = reader["HoraEntrada"] == DBNull.Value ? null : (TimeSpan?)reader["HoraEntrada"],
-                            HoraSalida = reader["HoraSalida"] == DBNull.Value ? null : (TimeSpan?)reader["HoraSalida"],
-                            HoraCambioARemoto = reader["HoraCambioARemoto"] == DBNull.Value ? null : (TimeSpan?)reader["HoraCambioARemoto"],
-                            HoraCambioAOficina = reader["HoraCambioAOficina"] == DBNull.Value ? null : (TimeSpan?)reader["HoraCambioAOficina"],
-                            IpEntrada = reader["IpEntrada"] as string,
-                            IpSalida = reader["IpSalida"] as string,
-                            ValidaIpOficina = reader["ValidaIpOficina"] as string,
-                            LatEntrada = reader["LatEntrada"] == DBNull.Value ? null : (decimal?)reader["LatEntrada"],
-                            LonEntrada = reader["LonEntrada"] == DBNull.Value ? null : (decimal?)reader["LonEntrada"],
-                            ValidaGpsOficina = reader["ValidaGpsOficina"] as string,
-                            UbicacionOficina = reader["UbicacionOficina"] as string,
-                            HorasBrutas = reader["HorasBrutas"] == DBNull.Value ? null : (double?)reader["HorasBrutas"],
-                            HorasEnRango = reader["HorasEnRango"] == DBNull.Value ? null : (double?)reader["HorasEnRango"],
-                            MinutosAlmuerzo = reader["MinutosAlmuerzo"] == DBNull.Value ? null : (int?)reader["MinutosAlmuerzo"],
-                            MinutosBreak = reader["MinutosBreak"] == DBNull.Value ? null : (int?)reader["MinutosBreak"],
-                            MinutosPermiso = reader["MinutosPermiso"] == DBNull.Value ? null : (int?)reader["MinutosPermiso"],
-                            MinutosTraslado = reader["MinutosTraslado"] == DBNull.Value ? null : (int?)reader["MinutosTraslado"],
-                            MinutosAtraso = reader["MinutosAtraso"] == DBNull.Value ? null : (int?)reader["MinutosAtraso"],
-                            MinutosSalidaAnticipada = reader["MinutosSalidaAnticipada"] == DBNull.Value ? null : (int?)reader["MinutosSalidaAnticipada"],
-                            HorasNetas = reader["HorasNetas"] == DBNull.Value ? null : (double?)reader["HorasNetas"],
-                            PorcentajeCumplimiento = reader["PorcentajeCumplimiento"] == DBNull.Value ? null : (double?)reader["PorcentajeCumplimiento"],
-                            Puntualidad = reader["Puntualidad"] as string,
-                            Semaforo = reader["Semaforo"] as string,
-                            EventosDelDia = reader["EventosDelDia"] as string,
-                            Observaciones = reader["Observaciones"] as string
-                        };
-                        listaDetalles.Add(dto);
-                    }
+                    JornadaId = reader.GetInt32(reader.GetOrdinal("JornadaId")),
+                    UsuarioId = reader.GetInt32(reader.GetOrdinal("UsuarioId")),
+                    NombreUsuario = reader["NombreUsuario"] as string,
+                    TipoJornada = reader["TipoJornada"] as string,
+                    Fecha = GetNullableDateTime(reader, "Fecha"),
+                    EstadoJornada = reader["EstadoJornada"] as string,
 
-                    // --- Segundo conjunto de resultados: Resumen Total ---
-                    // Avanza al siguiente result set. NextResultAsync() devuelve true si hay más resultados.
-                    if (await reader.NextResultAsync() && await reader.ReadAsync())
-                    {
-                        resumenTotal = new ReporteJornadaResumenDto
-                        {
-                            TotalJornadas = reader["TotalJornadas"] == DBNull.Value ? 0 : Convert.ToInt32(reader["TotalJornadas"]),
-                            TotalUsuarios = reader["TotalUsuarios"] == DBNull.Value ? 0 : Convert.ToInt32(reader["TotalUsuarios"]),
-                            TotalHorasNetas = reader["TotalHorasNetas"] == DBNull.Value ? null : (double?)Convert.ToDouble(reader["TotalHorasNetas"]),
-                            PromedioHorasNetas = reader["PromedioHorasNetas"] == DBNull.Value ? null : (double?)Convert.ToDouble(reader["PromedioHorasNetas"]),
-                            PorcentajeCumplimientoPromedio = reader["PorcentajeCumplimientoPromedio"] == DBNull.Value ? null : (double?)Convert.ToDouble(reader["PorcentajeCumplimientoPromedio"]),
-                            JornadasPuntuales = reader["JornadasPuntuales"] == DBNull.Value ? 0 : Convert.ToInt32(reader["JornadasPuntuales"]),
-                            PorcentajePuntualidad = reader["PorcentajePuntualidad"] == DBNull.Value ? null : (double?)Convert.ToDouble(reader["PorcentajePuntualidad"])
-                        };
-                    }
+                    HoraEntrada = GetNullableTimeSpan(reader, "HoraEntrada"),
+                    HoraSalida = GetNullableTimeSpan(reader, "HoraSalida"),
+                    HoraCambioARemoto = GetNullableTimeSpan(reader, "HoraCambioARemoto"),
+                    HoraCambioAOficina = GetNullableTimeSpan(reader, "HoraCambioAOficina"),
 
-                    // --- Tercer conjunto de resultados: Resumen Mensual ---
-                    // Vuelve a avanzar al siguiente result set.
-                    if (await reader.NextResultAsync())
+                    IpEntrada = reader["IpEntrada"] as string,
+                    IpSalida = reader["IpSalida"] as string,
+                    ValidaIpOficina = reader["ValidaIpOficina"] as string,
+
+                    LatEntrada = GetNullableDecimal(reader, "LatEntrada"),
+                    LonEntrada = GetNullableDecimal(reader, "LonEntrada"),
+                    ValidaGpsOficina = reader["ValidaGpsOficina"] as string,
+                    UbicacionOficina = reader["UbicacionOficina"] as string,
+
+                    HorasBrutas = GetNullableDecimal(reader, "HorasBrutas"),
+                    HorasEnRango = GetNullableDecimal(reader, "HorasEnRango"),
+
+                    MinutosAlmuerzo = GetNullableInt(reader, "MinutosAlmuerzo"),
+                    MinutosBreak = GetNullableInt(reader, "MinutosBreak"),
+                    MinutosPermiso = GetNullableInt(reader, "MinutosPermiso"),
+                    MinutosTraslado = GetNullableInt(reader, "MinutosTraslado"),
+                    MinutosReunion = GetNullableInt(reader, "MinutosReunion"),
+                    MinutosAtraso = GetNullableInt(reader, "MinutosAtraso"),
+                    MinutosSalidaAnticipada = GetNullableInt(reader, "MinutosSalidaAnticipada"),
+
+                    HorasNetas = GetNullableDecimal(reader, "HorasNetas"),
+                    PorcentajeCumplimiento = GetNullableDecimal(reader, "PorcentajeCumplimiento"),
+
+                    Puntualidad = reader["Puntualidad"] as string,
+                    Semaforo = reader["Semaforo"] as string,
+
+                    EventosDelDia = reader["EventosDelDia"] as string,
+                    Observaciones = reader["Observaciones"] as string
+                };
+
+                listaDetalles.Add(dto);
+            }
+
+            // --- 2) Resumen total ---
+            if (await reader.NextResultAsync().ConfigureAwait(false) &&
+                await reader.ReadAsync().ConfigureAwait(false))
+            {
+                resumenTotal = new ReporteJornadaResumenDto
+                {
+                    TotalJornadas = GetInt(reader, "TotalJornadas"),
+                    TotalUsuarios = GetInt(reader, "TotalUsuarios"),
+                    TotalHorasNetas = GetNullableDecimal(reader, "TotalHorasNetas"),
+                    PromedioHorasNetas = GetNullableDecimal(reader, "PromedioHorasNetas"),
+                    PorcentajeCumplimientoPromedio = GetNullableDecimal(reader, "PorcentajeCumplimientoPromedio"),
+                    JornadasPuntuales = GetInt(reader, "JornadasPuntuales"),
+                    PorcentajePuntualidad = GetNullableDecimal(reader, "PorcentajePuntualidad")
+                };
+            }
+            else
+            {
+                // Si no vino resumen (sin filas), devuelvo todo en cero
+                resumenTotal = new ReporteJornadaResumenDto
+                {
+                    TotalJornadas = 0,
+                    TotalUsuarios = 0,
+                    TotalHorasNetas = null,
+                    PromedioHorasNetas = null,
+                    PorcentajeCumplimientoPromedio = null,
+                    JornadasPuntuales = 0,
+                    PorcentajePuntualidad = null
+                };
+            }
+
+            // --- 3) Resumen mensual ---
+            if (await reader.NextResultAsync().ConfigureAwait(false))
+            {
+                while (await reader.ReadAsync().ConfigureAwait(false))
+                {
+                    var mensualDto = new ReporteJornadaResumenMensualDto
                     {
-                        while (await reader.ReadAsync())
-                        {
-                            var mensualDto = new ReporteJornadaResumenMensualDto
-                            {
-                                Mes = reader["Mes"] as string,
-                                JornadasEnMes = reader["JornadasEnMes"] == DBNull.Value ? 0 : Convert.ToInt32(reader["JornadasEnMes"]),
-                                UsuariosActivosEnMes = reader["UsuariosActivosEnMes"] == DBNull.Value ? 0 : Convert.ToInt32(reader["UsuariosActivosEnMes"]),
-                                TotalHorasNetasMes = reader["TotalHorasNetasMes"] == DBNull.Value ? null : (double?)Convert.ToDouble(reader["TotalHorasNetasMes"]),
-                                PromedioHorasNetasPorJornadaMes = reader["PromedioHorasNetasPorJornadaMes"] == DBNull.Value ? null : (double?)Convert.ToDouble(reader["PromedioHorasNetasPorJornadaMes"]),
-                                PorcentajeCumplimientoPromedioMes = reader["PorcentajeCumplimientoPromedioMes"] == DBNull.Value ? null : (double?)Convert.ToDouble(reader["PorcentajeCumplimientoPromedioMes"]),
-                                JornadasPuntualesEnMes = reader["JornadasPuntualesEnMes"] == DBNull.Value ? 0 : Convert.ToInt32(reader["JornadasPuntualesEnMes"]),
-                                PorcentajePuntualidadMes = reader["PorcentajePuntualidadMes"] == DBNull.Value ? null : (double?)Convert.ToDouble(reader["PorcentajePuntualidadMes"])
-                            };
-                            listaResumenMensual.Add(mensualDto);
-                        }
-                    }
+                        Mes = reader["Mes"] as string,
+                        JornadasEnMes = GetInt(reader, "JornadasEnMes"),
+                        UsuariosActivosEnMes = GetInt(reader, "UsuariosActivosEnMes"),
+                        TotalHorasNetasMes = GetNullableDecimal(reader, "TotalHorasNetasMes"),
+                        PromedioHorasNetasPorJornadaMes = GetNullableDecimal(reader, "PromedioHorasNetasPorJornadaMes"),
+                        PorcentajeCumplimientoPromedioMes = GetNullableDecimal(reader, "PorcentajeCumplimientoPromedioMes"),
+                        JornadasPuntualesEnMes = GetInt(reader, "JornadasPuntualesEnMes"),
+                        PorcentajePuntualidadMes = GetNullableDecimal(reader, "PorcentajePuntualidadMes")
+                    };
+
+                    listaResumenMensual.Add(mensualDto);
                 }
             }
+
             return (listaDetalles, resumenTotal, listaResumenMensual);
         }
+
+
+
+        private static bool IsDbNull(IDataRecord r, string name) =>
+    r[name] == DBNull.Value;
+
+        private static int GetInt(IDataRecord r, string name) =>
+            IsDbNull(r, name) ? 0 : Convert.ToInt32(r[name]);
+
+        private static int? GetNullableInt(IDataRecord r, string name) =>
+            IsDbNull(r, name) ? (int?)null : Convert.ToInt32(r[name]);
+
+        private static decimal? GetNullableDecimal(IDataRecord r, string name) =>
+            IsDbNull(r, name) ? (decimal?)null : Convert.ToDecimal(r[name]);
+
+        private static DateTime? GetNullableDateTime(IDataRecord r, string name) =>
+            IsDbNull(r, name) ? (DateTime?)null : Convert.ToDateTime(r[name]);
+
+        private static TimeSpan? GetNullableTimeSpan(IDataRecord r, string name) =>
+            IsDbNull(r, name) ? (TimeSpan?)null : (TimeSpan)r[name];
+
+
         public async Task<IEnumerable<Usuario>> ListarUsuariosPorPerfilAsync(int perfilId, int usuarioId)
         {
             // Ejecuta el SP y mapea el resultado a la entidad Usuario

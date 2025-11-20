@@ -1,0 +1,114 @@
+﻿@model BandejaSolicitudesViewModel
+
+@{
+    ViewData["Title"] = "Solicitudes de ajuste pendientes";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="container-xxl mt-4">
+    <div class="card shadow border-0">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h4 class="mb-0">
+                <i class="mdi mdi-clipboard-alert-outline me-1"></i>
+                Solicitudes de ajuste pendientes
+            </h4>
+            <span class="badge bg-warning-subtle text-warning">
+                Total pendientes: <strong>@Model.Pendientes.Count</strong>
+            </span>
+        </div>
+        <div class="card-body">
+            @if (!Model.Pendientes.Any())
+            {
+                <div class="alert alert-info text-center">
+                    No hay solicitudes pendientes.
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Colaborador</th>
+                                <th>Tipo ajuste</th>
+                                <th>Jornada</th>
+                                <th>Descripción</th>
+                                <th>Creado el</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in Model.Pendientes)
+                            {
+                                <tr>
+                                    <td>@item.NombreUsuario</td>
+                                    <td>
+                                        <span class="badge bg-secondary-subtle text-secondary">
+                                            @item.TipoAjuste
+                                        </span>
+                                    </td>
+                                    <td>
+                                        @if (item.FechaJornada.HasValue)
+                                        {
+                                            @item.FechaJornada.Value.ToString("yyyy-MM-dd")
+                                            <span class="text-muted small"> (@item.TipoJornada)</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">Sin jornada asociada</span>
+                                        }
+                                    </td>
+                                    <td>@item.Descripcion</td>
+                                    <td>@item.CreadoEl.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
+                                    <td class="text-end">
+                                        <form asp-action="MarcarAtendido" method="post" class="d-inline form-marcar-atendido">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="solicitudId" value="@item.SolicitudId" />
+                                            <button type="submit" class="btn btn-success btn-sm btn-marcar-atendido">
+                                                <i class="mdi mdi-check-circle-outline me-1"></i>
+                                                Marcar atendido
+                                            </button>
+                                        </form>
+
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const forms = document.querySelectorAll('.form-marcar-atendido');
+
+            forms.forEach(form => {
+                form.addEventListener('submit', async function (e) {
+                    e.preventDefault();
+
+                    const result = await Swal.fire({
+                        title: '¿Marcar como atendida?',
+                        text: 'Confirma que ya realizaste el ajuste en la jornada antes de marcar esta solicitud como atendida.',
+                        icon: 'question',
+                        showCancelButton: true,
+                        confirmButtonText: 'Sí, marcar atendida',
+                        cancelButtonText: 'Cancelar',
+                        reverseButtons: true,
+                        allowOutsideClick: false
+                    });
+
+                    if (result.isConfirmed) {
+                        form.submit();
+                    }
+                });
+            });
+        });
+    </script>
+}
+
+
