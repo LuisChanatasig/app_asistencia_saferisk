@@ -189,26 +189,70 @@ namespace app_asistencia_saferisk.Servicios
         }
 
 
+        /// <summary>
+        /// Determines whether the specified field in the given data record contains a database null (DBNull) value.
+        /// </summary>
+        /// <param name="r">The data record to inspect for a database null value. Cannot be null.</param>
+        /// <param name="name">The name of the field to check for a database null value. Cannot be null or empty.</param>
+        /// <returns>true if the specified field contains a database null (DBNull) value; otherwise, false.</returns>
 
         private static bool IsDbNull(IDataRecord r, string name) =>
     r[name] == DBNull.Value;
 
+        /// <summary>
+        /// Retrieves the value of the specified field as an integer, returning 0 if the field is null.
+        /// </summary>
+        /// <remarks>If the field value cannot be converted to an integer, an exception may be thrown.
+        /// This method treats database null values as 0.</remarks>
+        /// <param name="r">The data record containing the field to retrieve.</param>
+        /// <param name="name">The name of the field whose value is to be returned as an integer. Cannot be null.</param>
+        /// <returns>The integer value of the specified field, or 0 if the field is null.</returns>
         private static int GetInt(IDataRecord r, string name) =>
             IsDbNull(r, name) ? 0 : Convert.ToInt32(r[name]);
 
+        /// <summary>
+        /// Retrieves the value of the specified field as a nullable 32-bit integer.
+        /// </summary>
+        /// <param name="r">The data record containing the field to retrieve.</param>
+        /// <param name="name">The name of the field whose value is to be returned. Cannot be null.</param>
+        /// <returns>A nullable 32-bit integer representing the value of the specified field, or null if the field is DBNull.</returns>
         private static int? GetNullableInt(IDataRecord r, string name) =>
             IsDbNull(r, name) ? (int?)null : Convert.ToInt32(r[name]);
 
+        /// <summary>
+        /// Retrieves the value of the specified field as a nullable decimal from the given data record.
+        /// </summary>
+        /// <param name="r">The data record containing the field to retrieve. Must not be null.</param>
+        /// <param name="name">The name of the field to retrieve. Must not be null or empty.</param>
+        /// <returns>A nullable decimal representing the value of the specified field, or null if the field is DBNull.</returns>
         private static decimal? GetNullableDecimal(IDataRecord r, string name) =>
             IsDbNull(r, name) ? (decimal?)null : Convert.ToDecimal(r[name]);
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="r"></param>
+        /// <param name="name"></param>
+        /// <returns></returns>
         private static DateTime? GetNullableDateTime(IDataRecord r, string name) =>
             IsDbNull(r, name) ? (DateTime?)null : Convert.ToDateTime(r[name]);
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="r"></param>
+        /// <param name="name"></param>
+        /// <returns></returns>
         private static TimeSpan? GetNullableTimeSpan(IDataRecord r, string name) =>
             IsDbNull(r, name) ? (TimeSpan?)null : (TimeSpan)r[name];
 
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="perfilId"></param>
+        /// <param name="usuarioId"></param>
+        /// <returns></returns>
         public async Task<IEnumerable<Usuario>> ListarUsuariosPorPerfilAsync(int perfilId, int usuarioId)
         {
             // Ejecuta el SP y mapea el resultado a la entidad Usuario
